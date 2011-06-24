@@ -1,0 +1,31 @@
+Version 3.4
+	soap_tf2dm:
+	-Removed deprecated timelimit enforcement code.
+		-Use "mp_match_end_at_timelimit 1" instead.
+	-Added framework for a possible Free-For-All mode, if VALVe ever improves mp_friendlyfire.
+
+Version 3.3
+	soap_tf2dm:
+	-Fixed HDR bug.
+
+Version 3.2
+	soap_tournament:
+	-Fixed bug where soap_tournament would think both teams were ready when in reality only a single team was.
+
+Version 3.1
+	soap_tf2dm:
+	-Fixed multiple memory leaks.
+	-Restructured, organized, and commented code.
+	-Made code publically available.
+	-Improved map objective removal (Thanks to [GNC]Matt)
+	-Added many new spawns from dispos[able], with additional help from Root_.
+	-Fixed autoupdating.
+	-Various minor fixes and tweaks.
+	-Special thanks to Volt and The Drunken Brawl for being dedicated testers.
+
+	soap_tournament:
+	-Fixed a rare bug where soap_live.cfg would get executed on every map change.
+	-Made code publically available.
+
+Version 3.0
+	-Initial release.
