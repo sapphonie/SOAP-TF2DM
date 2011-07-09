@@ -1,8 +1,10 @@
 Version 3.4
 	soap_tf2dm:
-	-Removed deprecated timelimit enforcement code.
-		-Use "mp_match_end_at_timelimit 1" instead.
-	-Added framework for a possible Free-For-All mode, if VALVe ever improves mp_friendlyfire.
+	-Added translation support and Russian translation
+		-Contributed by Root.
+	-Added many new spawns.
+		-Contributed by Shwan.
+	-Added optional mapcycle.txt file that contains all maps with SOAP support.
 
 Version 3.3
 	soap_tf2dm:
