@@ -3,6 +3,7 @@
 // ====[ INCLUDES ]====================================================
 #include <sourcemod>
 #include <sdktools>
+#include <adminmenu>
 #include <tf2_stocks>
 
 // ====[ CONSTANTS ]===================================================
@@ -15,39 +16,44 @@
 new bool:FirstLoad;
 
 //Regen-over-time
-new Handle:g_hRegenTimer[MAXPLAYERS+1] = INVALID_HANDLE,
+new bool:g_bRegen[MAXPLAYERS+1],
+	Handle:g_hRegenTimer[MAXPLAYERS+1] = INVALID_HANDLE,
 	Handle:g_hRegenHP = INVALID_HANDLE,
+	g_iRegenHP,
 	Handle:g_hRegenTick = INVALID_HANDLE,
-	Handle:g_hKillStartRegen = INVALID_HANDLE,
-	Handle:g_hRegenDelay = INVALID_HANDLE,
 	Float:g_fRegenTick,
+	Handle:g_hRegenDelay = INVALID_HANDLE,
 	Float:g_fRegenDelay,
-	bool:g_bRegen[MAXPLAYERS+1],
-	bool:g_bKillStartRegen,
-	g_iRegenHP;
+	Handle:g_hKillStartRegen = INVALID_HANDLE,
+	bool:g_bKillStartRegen;
 
 //Spawning
 new Handle:g_hSpawn = INVALID_HANDLE,
+	Float:g_fSpawn,
 	Handle:g_hSpawnRandom = INVALID_HANDLE,
+	bool:g_bSpawnRandom,
+	bool:g_bSpawnMap,
 	Handle:g_hRedSpawns = INVALID_HANDLE,
 	Handle:g_hBluSpawns = INVALID_HANDLE,
-	Handle:g_hKv = INVALID_HANDLE,
-	Float:g_fSpawn,
-	bool:g_bSpawnRandom,
-	bool:g_bSpawnMap;
+	Handle:g_hKv = INVALID_HANDLE;
 
 //Kill Regens (hp+ammo)
-new Handle:g_hKillHealRatio = INVALID_HANDLE,
-	Handle:g_hKillHealStatic = INVALID_HANDLE,
-	Handle:g_hKillAmmo = INVALID_HANDLE,
-	Handle:g_hShowHP = INVALID_HANDLE,
-	Float:g_fKillHealRatio,
-	bool:g_bShowHP,
-	bool:g_bKillAmmo,
-	g_iMaxClips1[MAXPLAYERS+1],
+new g_iMaxClips1[MAXPLAYERS+1],
 	g_iMaxClips2[MAXPLAYERS+1],
 	g_iMaxHealth[MAXPLAYERS+1],
-	g_iKillHealStatic;
+	Handle:g_hKillHealRatio = INVALID_HANDLE,
+	Float:g_fKillHealRatio,
+	Handle:g_hKillHealStatic = INVALID_HANDLE,
+	g_iKillHealStatic,
+	Handle:g_hKillAmmo = INVALID_HANDLE,
+	bool:g_bKillAmmo,
+	Handle:g_hShowHP = INVALID_HANDLE,
+	bool:g_bShowHP;
+
+//Time limit enforcement
+new Handle:g_hForceTimeLimit = INVALID_HANDLE,
+	bool:g_bForceTimeLimit,
+	Handle:g_tCheckTimeLeft = INVALID_HANDLE;
 	
 //Doors
 new Handle:g_hOpenDoors = INVALID_HANDLE,
@@ -71,6 +77,7 @@ public Plugin:myinfo =
  * -------------------------------------------------------------------------- */
 public OnPluginStart()
 {
+	LoadTranslations("soap_tf2dm.phrases");
 	// Create convars
 	CreateConVar("soap", PLUGIN_VERSION, PLUGIN_NAME, FCVAR_PLUGIN|FCVAR_REPLICATED);
 	g_hRegenHP = CreateConVar("soap_regenhp", "1", "Health added per regeneration tick. Set to 0 to disable.", FCVAR_PLUGIN|FCVAR_NOTIFY);
@@ -84,6 +91,7 @@ public OnPluginStart()
 	g_hKillAmmo = CreateConVar("soap_kill_ammo", "1", "Enable ammo restoration on kills.", FCVAR_PLUGIN|FCVAR_NOTIFY);
 	g_hOpenDoors = CreateConVar("soap_opendoors", "1", "Force all doors to open. Required on maps like cp_well.", FCVAR_PLUGIN|FCVAR_NOTIFY);
 	g_hShowHP = CreateConVar("soap_showhp", "1", "Print killer's health to victim on death.", FCVAR_PLUGIN|FCVAR_NOTIFY);
+	g_hForceTimeLimit  = CreateConVar("soap_forcetimelimit", "1", "Time limit enforcement, used to fix a never-ending round issue on gravelpit.", _, true, 0.0, true, 1.0);
 	
 	// Hook convar changes and events
 	HookConVarChange(g_hRegenHP, handler_ConVarChange);
@@ -97,6 +105,7 @@ public OnPluginStart()
 	HookConVarChange(g_hKillAmmo, handler_ConVarChange);
 	HookConVarChange(g_hOpenDoors, handler_ConVarChange);
 	HookConVarChange(g_hShowHP, handler_ConVarChange);
+	HookConVarChange(g_hForceTimeLimit, handler_ConVarChange);
 	HookEvent("player_death", Event_player_death);
 	HookEvent("player_hurt", Event_player_hurt);
 	HookEvent("player_spawn", Event_player_spawn);
@@ -110,11 +119,17 @@ public OnPluginStart()
 	// Crutch to fix some issues that appear when the plugin is loaded mid-round.
 	FirstLoad = true;
 	
+	// Begin the time check that prevents infinite rounds on A/D and KOTH maps. It is run here as well as in OnMapStart() so that it will still work even if the plugin is loaded mid-round.
+	CreateTimeCheck();
+	
 	// Lock control points and intel on map. Also respawn all players into DM spawns. This instance of LockMap() is needed for mid-round loads of DM. (See: Volt's DM/Pub hybrid server.)
 	LockMap();
 	
 	// Reset all player's regens. Used here for mid-round loading compatability.
 	ResetPlayers();
+	
+	// Create configuration file in cfg/sourcemod folder
+	AutoExecConfig(true, "soap_tf2dm", "sourcemod");
 }
 
 /* OnGetGameDescription()
@@ -134,7 +149,13 @@ public Action:OnGetGameDescription(String:gameDesc[64])
  * -------------------------------------------------------------------------- */
 public OnMapStart()
 {
-	// Kill timers
+	// Kill everything, because fuck memory leaks.
+	if(g_tCheckTimeLeft!=INVALID_HANDLE)
+	{
+		KillTimer(g_tCheckTimeLeft);
+		g_tCheckTimeLeft = INVALID_HANDLE;
+	}
+	
 	for (new i = 0; i < MaxClients+1; i++)
 	{	
 		if(g_hRegenTimer[i]!=INVALID_HANDLE)
@@ -236,6 +257,9 @@ public OnMapStart()
 	
 	// Load the sound file played when a player is spawned.
 	PrecacheSound("items/spawn_item.wav", true);
+	
+	// Begin the time check that prevents infinite rounds on A/D and KOTH maps.
+	CreateTimeCheck();
 }
 
 /* OnMapEnd()
@@ -244,7 +268,14 @@ public OnMapStart()
  * -------------------------------------------------------------------------- */
 public OnMapEnd()
 {		
-	// Kill timers.
+	// Memory leaks: fuck 'em.
+	
+	if(g_tCheckTimeLeft!=INVALID_HANDLE)
+	{
+		KillTimer(g_tCheckTimeLeft);
+		g_tCheckTimeLeft = INVALID_HANDLE;
+	}
+	
 	for (new i = 0; i < MAXPLAYERS+1; i++)
 	{	
 		if(g_hRegenTimer[i]!=INVALID_HANDLE)
@@ -273,6 +304,7 @@ public OnConfigsExecuted()
 	g_bKillAmmo = GetConVarBool(g_hKillAmmo);
 	g_bOpenDoors = GetConVarBool(g_hOpenDoors);
 	g_bShowHP = GetConVarBool(g_hShowHP);
+	g_bForceTimeLimit = GetConVarBool(g_hForceTimeLimit);
 }
 
 
@@ -320,22 +352,131 @@ public handler_ConVarChange(Handle:convar, const String:oldValue[], const String
 		g_fRegenTick = StringToFloat(newValue);
 	else if (convar == g_hRegenDelay)
 		g_fRegenDelay = StringToFloat(newValue);
-	else if (convar == g_hKillStartRegen)
-		StringToInt(newValue) ? (g_bKillStartRegen = true) : (g_bKillStartRegen  = false);
+	else if (convar == g_hKillStartRegen) {
+		if(StringToInt(newValue) >= 1)
+			g_bKillStartRegen = true;
+		else if(StringToInt(newValue) <= 0)
+			g_bKillStartRegen = false;
+	}
 	else if (convar == g_hSpawn)
 		g_fSpawn = StringToFloat(newValue);
-	else if (convar == g_hSpawnRandom)
-		StringToInt(newValue) ? (g_bSpawnRandom = true) : (g_bSpawnRandom  = false);
+	else if (convar == g_hSpawnRandom) {
+		if(StringToInt(newValue) >= 1)
+			g_bSpawnRandom = true;
+		else if(StringToInt(newValue) <= 0)
+			g_bSpawnRandom = false;
+	}
 	else if (convar == g_hKillHealRatio)
 		g_fKillHealRatio = StringToFloat(newValue);
 	else if (convar == g_hKillHealStatic)
 		g_iKillHealStatic = StringToInt(newValue);
-	else if (convar == g_hKillAmmo)
-		StringToInt(newValue) ? (g_bKillAmmo = true) : (g_bKillAmmo = false);
-	else if (convar == g_hOpenDoors)
-		StringToInt(newValue) ? (g_bOpenDoors = true) : (g_bOpenDoors  = false);
-	else if (convar == g_hShowHP)
-		StringToInt(newValue) ? (g_bShowHP = true) : (g_bShowHP  = false);
+	else if (convar == g_hKillAmmo) {
+		if(StringToInt(newValue) >= 1)
+			g_bKillAmmo = true;
+		else if(StringToInt(newValue) <= 0)
+			g_bKillAmmo = false;
+	}
+	else if (convar == g_hForceTimeLimit) {
+		if(StringToInt(newValue) >= 1)
+			g_bForceTimeLimit = true;
+		else if(StringToInt(newValue) <= 0)
+			g_bForceTimeLimit = false;
+	}
+	else if (convar == g_hOpenDoors) {
+		if(StringToInt(newValue) >= 1)
+			g_bOpenDoors = true;
+		else if(StringToInt(newValue) <= 0)
+			g_bOpenDoors = false;
+	}
+	else if (convar == g_hShowHP) {
+		if(StringToInt(newValue) >= 1)
+			g_bShowHP = true;
+		else if(StringToInt(newValue) <= 0)
+			g_bShowHP = false;
+	}
+}
+
+/*
+ * ------------------------------------------------------------------
+ *	  _______                 ___            _ __ 
+ *	 /_  __(_)____ ___  ___  / (_)____ ___  (_) /_
+ *	  / / / // __ `__ \/ _ \/ / // __ `__ \/ / __/
+ *	 / / / // / / / / /  __/ / // / / / / / / /_  
+ *	/_/ /_//_/ /_/ /_/\___/_/_//_/ /_/ /_/_/\__/ 
+ * ------------------------------------------------------------------
+ */
+ 
+/* CheckTime()
+ *
+ * Check map time left every 15 seconds.
+ * -------------------------------------------------------------------------- */
+public Action:CheckTime(Handle:timer)
+{
+	new iTimeLeft;
+	new iTimeLimit;
+	GetMapTimeLeft(iTimeLeft);
+	GetMapTimeLimit(iTimeLimit);
+	
+	// If soap_forcetimelimit = 1, mp_timelimit != 0, and the timeleft is < 0, change the map to sm_nextmap in 15 seconds.
+	if (g_bForceTimeLimit && iTimeLeft <= 0 && iTimeLimit > 0) 
+	{	
+		if(GetRealClientCount() > 0) // Prevents a constant map change issue present on a small number of servers.
+		{
+			CreateTimer(15.0, ChangeMap, _, TIMER_FLAG_NO_MAPCHANGE);
+			if(g_tCheckTimeLeft != INVALID_HANDLE)
+			{
+				KillTimer(g_tCheckTimeLeft);
+				g_tCheckTimeLeft = INVALID_HANDLE;
+			}
+		}
+	}
+}
+
+/* ChangeMap()
+ *
+ * Changes the map whatever sm_nextmap is.
+ * -------------------------------------------------------------------------- */
+public Action:ChangeMap(Handle:timer)
+{
+	// If sm_nextmap isn't set or isn't registered, abort because there is nothing to change to.
+	if (FindConVar("sm_nextmap") == INVALID_HANDLE)
+	{
+		LogError("[SOAP] FATAL: Could not find sm_nextmap cvar. Cannot force a map change!");
+		return;
+	}
+	
+	new iTimeLeft;
+	new iTimeLimit;
+	GetMapTimeLeft(iTimeLeft);
+	GetMapTimeLimit(iTimeLimit);
+	
+	// Check that soap_forcetimelimit = 1, mp_timelimit != 0, and timeleft < 0 again, because something could have changed in the last 15 seconds.
+	if(g_bForceTimeLimit && iTimeLeft <= 0 &&  iTimeLimit > 0)
+	{
+		new String:newmap[65];
+		GetNextMap(newmap, sizeof(newmap));
+		ForceChangeLevel(newmap, "Enforced Map Timelimit");
+	} else {  // Turns out something did change.
+		LogMessage("[SOAP] Aborting forced map change due to soap_forcetimelimit 1 or timelimit > 0.");
+		
+		if(iTimeLeft > 0)
+			CreateTimeCheck();
+	}
+}
+
+/* CreateTimeCheck()
+ *
+ * Used to create the timer that checks if the round is over.
+ * -------------------------------------------------------------------------- */
+CreateTimeCheck()
+{
+	if(g_tCheckTimeLeft != INVALID_HANDLE)
+	{
+		KillTimer(g_tCheckTimeLeft);
+		g_tCheckTimeLeft = INVALID_HANDLE;
+	}
+		
+	g_tCheckTimeLeft = CreateTimer(15.0, CheckTime, _, TIMER_REPEAT);
 }
 
 /*
@@ -570,9 +711,9 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 		if(g_bShowHP)
 		{
 			if(IsPlayerAlive(attacker))
-				PrintToChat(client, "[SOAP] Your attacker had %i health remaining.", GetClientHealth(attacker));
+				PrintToChat(client, "[SOAP] %t", "Health Remaining", GetClientHealth(attacker));
 			else
-				PrintToChat(client, "[SOAP] Your attacker is dead.");
+				PrintToChat(client, "[SOAP] %t", "Attacker is dead");
 		}
 		
 		// Heals a percentage of the killer's class' max health.
@@ -726,7 +867,7 @@ LockMap()
 									"logic_relay",
 									"item_teamflag"
 									};
-
+								
 	for(new i = 0; i < sizeof(saRemove); i++)
 	{
 		new ent = MAXPLAYERS+1;
@@ -831,4 +972,23 @@ stock FindEntityByClassname2(startEnt, const String:classname[])
 	while (startEnt > -1 && !IsValidEntity(startEnt)) startEnt--;
 
 	return FindEntityByClassname(startEnt, classname);
+}
+
+/* GetRealClientCount()
+ *
+ * Gets the number of clients connected to the game..
+ * -------------------------------------------------------------------------- */
+stock GetRealClientCount()
+{
+	new clients = 0;
+	
+	for(new i = 1; i <= MaxClients; i++)
+	{
+		if(IsValidClient(i))
+		{
+			clients++;
+		}
+	}
+	
+	return clients;
 }

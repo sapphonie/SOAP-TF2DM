@@ -1,0 +1,20 @@
+"Phrases"
+{
+	"Health Remaining"
+	{
+		"#format"		"{1:i}"
+		"ru"			"У противника осталось {1} хп."
+	}
+	"Attacker is dead"
+	{
+		"ru"			"Ваш убийца мёртв."
+	}
+	"Plugins unloaded"
+	{
+		"ru"			"Плагины отключены."
+	}
+	"Plugins reloaded"
+	{
+		"ru"			"Плагины загружены."
+	}
+}

@@ -1,0 +1,20 @@
+"Phrases"
+{
+	"Health Remaining"
+	{
+		"#format"		"{1:i}"
+		"en"			"Your attacker had {1} health remaining."
+	}
+	"Attacker is dead"
+	{
+		"en"			"Your attacker is dead."
+	}
+	"Plugins unloaded"
+	{
+		"en"			"Plugins unloaded."
+	}
+	"Plugins reloaded"
+	{
+		"en"			"Plugins reloaded."
+	}
+}

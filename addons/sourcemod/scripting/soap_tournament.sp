@@ -23,8 +23,7 @@ public Plugin:myinfo =
 // ====[ VARIABLES ]===================================================
 
 new bool:teamReadyState[2] = { false, false },
-	bool:g_dm = false,
-	Handle:g_hLive = INVALID_HANDLE;
+	bool:g_dm = false;
 
 // ====[ FUNCTIONS ]===================================================
 
@@ -35,10 +34,7 @@ new bool:teamReadyState[2] = { false, false },
 
 public OnPluginStart()
 {
-	/* Live Cvar - Useful to only two people in the entire world. 
-	   Can be hooked by other plugins to determine the state of a match */
-	g_hLive = CreateConVar("soap_live", "1", "Is the match live?", FCVAR_PLUGIN, true, 0.0, true, 1.0);
-	
+	LoadTranslations("soap_tf2dm.phrases");
 	// Game restart
 	//HookEvent("teamplay_restart_round", GameRestartEvent);
 
@@ -77,8 +73,7 @@ StopDeathmatching()
 	if(g_dm == true)
 	{
 		ServerCommand("exec sourcemod/soap_live.cfg");
-		PrintToChatAll("[SOAP] Plugins unloaded.");
-		SetConVarInt(g_hLive, true);
+		PrintToChatAll("[SOAP] %t", "Plugins unloaded");
 		g_dm = false;
 	}
 }
@@ -92,8 +87,7 @@ StartDeathmatching()
 	if(g_dm == false)
 	{
 		ServerCommand("exec sourcemod/soap_notlive.cfg");
-		PrintToChatAll("[SOAP] Plugins reloaded.");
-		SetConVarInt(g_hLive, false);
+		PrintToChatAll("[SOAP] %t", "Plugins reloaded");
 		g_dm = true;
 	}
 }
