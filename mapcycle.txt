@@ -10,8 +10,6 @@ cp_freight
 cp_granary
 cp_gravelpit
 cp_greenvalley_b4a
-cp_gullywash_imp3
-cp_gullywash
 cp_indulge
 cp_mainline_rc6
 cp_obscure_final
@@ -23,9 +21,10 @@ ctf_chaos
 ctf_turbine
 koth_ashville_rc1
 koth_viaduct
-cp_snakewater_rc3
-cp_gullywash_pro
 koth_pro_viaduct_rc3
-koth_pro_viaduct_rc2
 cp_warmfront
 koth_ultiduo_r_b7
+cp_snakewater
+cp_standin_b5
+cp_foundry
+cp_gullywash_final1
