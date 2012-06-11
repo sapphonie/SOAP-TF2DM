@@ -693,8 +693,9 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 {
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	new clientid = GetClientUserId(client);
-	
-	if(!IsValidClient(client))
+
+	new isDeadRinger = GetEventInt(event,"death_flags") & 32;
+	if(!IsValidClient(client) || isDeadRinger)
 		return;
 	
 	CreateTimer(g_fSpawn, Respawn, clientid, TIMER_FLAG_NO_MAPCHANGE);
