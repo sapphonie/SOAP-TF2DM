@@ -3,7 +3,6 @@
 // ====[ INCLUDES ]====================================================
 #include <sourcemod>
 #include <sdktools>
-#include <adminmenu>
 #include <tf2_stocks>
 
 // ====[ CONSTANTS ]===================================================
