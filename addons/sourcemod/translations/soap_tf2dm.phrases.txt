@@ -17,4 +17,14 @@
 	{
 		"en"			"Plugins reloaded."
 	}
+	"Kill HP Received"
+	{
+		"#format"		"{1:i},{2:s}"
+		"en"			"You got {1} hp for killing {2}"
+	}
+	"Damage HP Received"
+	{
+		"#format"		"{1:i},{2:s}"
+		"en"			"You got {1} hp for damaging {2}"
+	}
 }
