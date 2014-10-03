@@ -4,11 +4,13 @@
 #include <sourcemod>
 #include <sdktools>
 #include <tf2_stocks>
+#undef REQUIRE_PLUGIN
+#include <afk>
 
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME		"SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR		"MikeJS, Lange, & Tondark"
-#define PLUGIN_VERSION		"3.4"
+#define PLUGIN_VERSION		"3.5"
 #define PLUGIN_CONTACT		"http://www.mikejsavage.com/, http://steamcommunity.com/id/langeh/"
 
 // ====[ VARIABLES ]===================================================
@@ -42,6 +44,8 @@ new g_iMaxClips1[MAXPLAYERS+1],
 	g_iMaxHealth[MAXPLAYERS+1],
 	Handle:g_hKillHealRatio = INVALID_HANDLE,
 	Float:g_fKillHealRatio,
+	Handle:g_hDamageHealRatio = INVALID_HANDLE,
+	Float:g_fDamageHealRatio,
 	Handle:g_hKillHealStatic = INVALID_HANDLE,
 	g_iKillHealStatic,
 	Handle:g_hKillAmmo = INVALID_HANDLE,
@@ -57,6 +61,15 @@ new Handle:g_hForceTimeLimit = INVALID_HANDLE,
 //Doors
 new Handle:g_hOpenDoors = INVALID_HANDLE,
 	bool:g_bOpenDoors;
+
+//Regen damage given on kill
+#define RECENT_DAMAGE_SECONDS 10
+new g_iRecentDamage[MAXPLAYERS+1][MAXPLAYERS+1][RECENT_DAMAGE_SECONDS],
+	Handle:g_hRecentDamageTimer
+	;
+
+//AFK
+new g_bAFKSupported;
 
 // ====[ PLUGIN ]======================================================
 public Plugin:myinfo =
@@ -76,6 +89,8 @@ public Plugin:myinfo =
  * -------------------------------------------------------------------------- */
 public OnPluginStart()
 {
+	g_bAFKSupported = LibraryExists("afk");
+	
 	LoadTranslations("soap_tf2dm.phrases");
 	// Create convars
 	CreateConVar("soap", PLUGIN_VERSION, PLUGIN_NAME, FCVAR_PLUGIN|FCVAR_REPLICATED);
@@ -86,6 +101,7 @@ public OnPluginStart()
 	g_hSpawn = CreateConVar("soap_spawn_delay", "1.5", "Spawn timer.", FCVAR_PLUGIN|FCVAR_NOTIFY);
 	g_hSpawnRandom = CreateConVar("soap_spawnrandom", "1", "Enable random spawns.", FCVAR_PLUGIN|FCVAR_NOTIFY);
 	g_hKillHealRatio = CreateConVar("soap_kill_heal_ratio", "0.5", "Percentage of HP to restore on kills. .5 = 50%. Should not be used with soap_kill_heal_static.", FCVAR_PLUGIN|FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_hDamageHealRatio = CreateConVar("soap_dmg_heal_ratio", "0.0", "Percentage of HP to restore based on amount of damage given. .5 = 50%. Should not be used with soap_kill_heal_static.", FCVAR_PLUGIN|FCVAR_NOTIFY, true, 0.0, true, 1.0);
 	g_hKillHealStatic = CreateConVar("soap_kill_heal_static", "0", "Amount of HP to restore on kills. Exact value applied the same to all classes. Should not be used with soap_kill_heal_ratio.", FCVAR_PLUGIN|FCVAR_NOTIFY);
 	g_hKillAmmo = CreateConVar("soap_kill_ammo", "1", "Enable ammo restoration on kills.", FCVAR_PLUGIN|FCVAR_NOTIFY);
 	g_hOpenDoors = CreateConVar("soap_opendoors", "1", "Force all doors to open. Required on maps like cp_well.", FCVAR_PLUGIN|FCVAR_NOTIFY);
@@ -100,6 +116,7 @@ public OnPluginStart()
 	HookConVarChange(g_hSpawn, handler_ConVarChange);
 	HookConVarChange(g_hSpawnRandom, handler_ConVarChange);
 	HookConVarChange(g_hKillHealRatio, handler_ConVarChange);
+	HookConVarChange(g_hDamageHealRatio, handler_ConVarChange);
 	HookConVarChange(g_hKillHealStatic, handler_ConVarChange);
 	HookConVarChange(g_hKillAmmo, handler_ConVarChange);
 	HookConVarChange(g_hOpenDoors, handler_ConVarChange);
@@ -108,6 +125,7 @@ public OnPluginStart()
 	HookEvent("player_death", Event_player_death);
 	HookEvent("player_hurt", Event_player_hurt);
 	HookEvent("player_spawn", Event_player_spawn);
+	HookEvent("player_team", Event_player_team);
 	HookEvent("teamplay_round_start", Event_round_start);
 	HookEvent("teamplay_restart_round", Event_round_start);
 
@@ -129,6 +147,17 @@ public OnPluginStart()
 	
 	// Create configuration file in cfg/sourcemod folder
 	AutoExecConfig(true, "soap_tf2dm", "sourcemod");
+}
+
+public OnLibraryAdded(const String:name[]) {
+	// Set up auto updater
+	if (StrEqual(name, "afk"))
+		g_bAFKSupported = true;
+}
+
+public OnLibraryRemoved(const String:name[]) {
+	if (StrEqual(name, "afk"))
+		g_bAFKSupported = false;
 }
 
 /* OnGetGameDescription()
@@ -299,6 +328,8 @@ public OnConfigsExecuted()
 	g_fSpawn = GetConVarFloat(g_hSpawn);
 	g_bSpawnRandom = GetConVarBool(g_hSpawnRandom);
 	g_fKillHealRatio = GetConVarFloat(g_hKillHealRatio);
+	g_fDamageHealRatio = GetConVarFloat(g_hDamageHealRatio);
+	StartStopRecentDamagePushbackTimer();
 	g_iKillHealStatic = GetConVarInt(g_hKillHealStatic);
 	g_bKillAmmo = GetConVarBool(g_hKillAmmo);
 	g_bOpenDoors = GetConVarBool(g_hOpenDoors);
@@ -319,6 +350,9 @@ public OnClientConnected(client)
 		KillTimer(g_hRegenTimer[client]);
 		g_hRegenTimer[client] = INVALID_HANDLE;
 	}
+	
+	// Reset the player's damage given/received to 0.
+	ResetPlayerDmgBasedRegen(client, true);
 	
 	// Kills the annoying 30 second "waiting for players" at the start of a map.
 	ServerCommand("mp_waitingforplayers_cancel 1");
@@ -367,7 +401,10 @@ public handler_ConVarChange(Handle:convar, const String:oldValue[], const String
 	}
 	else if (convar == g_hKillHealRatio)
 		g_fKillHealRatio = StringToFloat(newValue);
-	else if (convar == g_hKillHealStatic)
+	else if (convar == g_hDamageHealRatio) {
+		g_fDamageHealRatio = StringToFloat(newValue);
+		StartStopRecentDamagePushbackTimer();
+	} else if (convar == g_hKillHealStatic)
 		g_iKillHealStatic = StringToInt(newValue);
 	else if (convar == g_hKillAmmo) {
 		if(StringToInt(newValue) >= 1)
@@ -673,6 +710,47 @@ GetWeaponAmmo(String:w[32])
 	}
 }
 
+/* Timer_RecentDamagePushback()
+ *
+ * Every second push back all recent damage by 1 index.
+ * This ensures we only remember the last 9-10 seconds of recent damage.
+ * -------------------------------------------------------------------------- */
+public Action:Timer_RecentDamagePushback(Handle:timer, any:clientid)
+{
+	for (new i = 1; i <= MaxClients; i++) {
+		if (!IsValidClient(i))
+			continue;
+		
+		for (new j = 1; j <= MaxClients; j++) {
+			if (!IsValidClient(j))
+				continue;
+			for (new k = RECENT_DAMAGE_SECONDS - 2; k >= 0; k--) {
+				g_iRecentDamage[i][j][k+1] = g_iRecentDamage[i][j][k];
+			}
+			g_iRecentDamage[i][j][0] = 0;
+		}
+	}
+}
+
+/* StartStopRecentDamagePushbackTimer()
+ *
+ * Starts or stops the recent damage pushback timer, based on the current value
+ * of the corresponding ConVar.
+ * -------------------------------------------------------------------------- */
+StartStopRecentDamagePushbackTimer()
+{
+	if (g_fDamageHealRatio > 0.0) {
+		if (g_hRecentDamageTimer == INVALID_HANDLE)
+			g_hRecentDamageTimer = CreateTimer(1.0, Timer_RecentDamagePushback, _, TIMER_REPEAT);
+	} else {
+		if (g_hRecentDamageTimer != INVALID_HANDLE) {
+			KillTimer(g_hRecentDamageTimer);
+			g_hRecentDamageTimer = INVALID_HANDLE;
+		}
+	}
+}
+
+
 /*
  * ------------------------------------------------------------------
  *		______                  __      
@@ -723,7 +801,7 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 				SetEntProp(attacker, Prop_Data, "m_iHealth", g_iMaxHealth[attacker]);
 			else
 				SetEntProp(attacker, Prop_Data, "m_iHealth", GetClientHealth(attacker) + RoundFloat(g_fKillHealRatio * g_iMaxHealth[attacker]));
-		}	
+		}
 		
 		// Heals a flat value, regardless of class.
 		if(g_iKillHealStatic > 0)
@@ -760,6 +838,40 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 		if(g_bKillStartRegen && !g_bRegen[attacker])
 			StartRegen(INVALID_HANDLE, attacker);
 	}
+	
+	// Heal the people that damaged the victim (also if the victim died without there being an attacker).
+	if(g_fDamageHealRatio > 0.0)
+	{
+		decl String:clientname[32];
+		GetClientName(client, clientname, sizeof(clientname));
+		for(new player = 1; player <= MaxClients; player++) {
+			if(!IsValidClient(player))
+				continue;
+			
+			new dmg = 0;
+			for(new i = 0; i < RECENT_DAMAGE_SECONDS; i++) {
+				dmg += g_iRecentDamage[client][player][i];
+				g_iRecentDamage[client][player][i] = 0;
+			}
+			
+			dmg = RoundFloat(dmg * g_fDamageHealRatio);
+			
+			if(dmg > 0 && IsPlayerAlive(player)) {
+				if((GetClientHealth(player) + dmg) > g_iMaxHealth[player])
+					SetEntProp(player, Prop_Data, "m_iHealth", g_iMaxHealth[player]);
+				else
+					SetEntProp(player, Prop_Data, "m_iHealth", GetClientHealth(player) + dmg);
+				
+				PrintToChat(player, "[SOAP] %t", attacker == player ? "Kill HP Received" : "Damage HP Received", dmg, clientname);
+			}
+		}
+	}	
+	
+	// Reset the player's recent damage
+	if(g_fDamageHealRatio > 0.0)
+	{
+		ResetPlayerDmgBasedRegen(client);
+	}	
 }
 
 /* Event_player_hurt()
@@ -768,9 +880,10 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
  * -------------------------------------------------------------------------- */
 public Action:Event_player_hurt(Handle:event, const String:name[], bool:dontBroadcast)
 {
+	new clientid = GetEventInt(event, "userid");
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
-	new clientid = GetClientUserId(client);
+	new damage = GetEventInt(event, "damageamount");
 	
 	if(IsValidClient(attacker) && client!=attacker)
 	{
@@ -783,6 +896,8 @@ public Action:Event_player_hurt(Handle:event, const String:name[], bool:dontBroa
 		}
 		
 		g_hRegenTimer[client] = CreateTimer(g_fRegenDelay, StartRegen, clientid);
+		
+		g_iRecentDamage[client][attacker][0] += damage;
 	}
 }
 
@@ -805,13 +920,15 @@ public Action:Event_player_spawn(Handle:event, const String:name[], bool:dontBro
 	if(!IsValidClient(client))
 		return;
 		
-	if(g_bSpawnRandom && g_bSpawnMap) // Are random spawns on and does this map have spawns?
+	if(g_bSpawnRandom && g_bSpawnMap && (!g_bAFKSupported || !IsPlayerAFK(client))) // Are random spawns on and does this map have spawns?
 		CreateTimer(0.01, RandomSpawn, clientid, TIMER_FLAG_NO_MAPCHANGE);
 	else {
 		// Play a sound anyway, because sounds are cool.
-		decl Float:vecOrigin[3];
-		GetClientEyePosition(client, vecOrigin);
-		EmitAmbientSound("items/spawn_item.wav", vecOrigin);
+		if (!g_bAFKSupported || !IsPlayerAFK(client)) { // Don't play a sound if the player is AFK
+			decl Float:vecOrigin[3];
+			GetClientEyePosition(client, vecOrigin);
+			EmitAmbientSound("items/spawn_item.wav", vecOrigin);
+		}
 	}
 	
 	// Get the player's max health and store it in a global variable. Doing it this way is handy for things like the Gunslinger and Eyelander, which change max health.
@@ -835,6 +952,44 @@ public Action:Event_player_spawn(Handle:event, const String:name[], bool:dontBro
 public Action:Event_round_start(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	LockMap();
+}
+
+/* Event_player_team()
+ *
+ * Called when a player joins a team.
+ * -------------------------------------------------------------------------- */
+public Action:Event_player_team(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	new clientid = GetEventInt(event, "userid");
+	new client = GetClientOfUserId(clientid);
+	
+	new team = GetEventInt(event, "team");
+	new oldteam = GetEventInt(event, "oldteam");
+	
+	if (team != oldteam) {
+		ResetPlayerDmgBasedRegen(client, true);
+	}
+	
+	return Plugin_Continue;
+}
+
+/* OnAfkStateChanged()
+ *
+ * Called when the AFK state of a player has changed.
+ * It is the AFK plugin that calls this method.
+ * -------------------------------------------------------------------------- */
+public OnAfkStateChanged(client, bool:afk) {
+	new TFTeam:team = TFTeam:GetClientTeam(client);
+	if (team != TFTeam_Blue && team != TFTeam_Red)
+		return;
+	
+	if (afk) {
+		// Move back to spawn
+		TF2_RespawnPlayer(client);
+	} else {
+		// Move to battlefield
+		CreateTimer(0.01, RandomSpawn, GetClientUserId(client), TIMER_FLAG_NO_MAPCHANGE);
+	}
 }
 
 /*
@@ -946,6 +1101,29 @@ ResetPlayers()
 				CreateTimer(0.1, StartRegen, id, TIMER_FLAG_NO_MAPCHANGE);
 			}
 		}	
+	}
+	
+	for (new i = 1; i <= MaxClients; i++)
+		ResetPlayerDmgBasedRegen(i);
+}
+
+/* ResetPlayerDmgBasedRegen()
+ *
+ * Resets the client's recent damage output to 0.
+ * -------------------------------------------------------------------------- */
+ResetPlayerDmgBasedRegen(client, bool:alsoResetTaken = false) {
+	for(new player = 1; player <= MaxClients; player++) {
+		for(new i = 0; i < RECENT_DAMAGE_SECONDS; i++) {
+			g_iRecentDamage[player][client][i] = 0;
+		}
+	}
+	
+	if (alsoResetTaken) {
+		for(new player = 1; player <= MaxClients; player++) {
+			for(new i = 0; i < RECENT_DAMAGE_SECONDS; i++) {
+				g_iRecentDamage[client][player][i] = 0;
+			}
+		}
 	}
 }
 
