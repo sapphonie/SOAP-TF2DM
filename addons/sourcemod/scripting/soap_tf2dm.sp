@@ -10,7 +10,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME		"SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR		"MikeJS, Lange, & Tondark"
-#define PLUGIN_VERSION		"3.5"
+#define PLUGIN_VERSION		"3.6"
 #define PLUGIN_CONTACT		"http://www.mikejsavage.com/, http://steamcommunity.com/id/langeh/"
 
 // ====[ VARIABLES ]===================================================
@@ -209,75 +209,68 @@ public OnMapStart()
 		CloseHandle(g_hKv);
 		
 	g_hKv = CreateKeyValues("Spawns");
-
-	decl String:path[256];
-	BuildPath(Path_SM, path, sizeof(path), "configs/soap.cfg");
 	
-	if(FileExists(path))
-	{
-		FileToKeyValues(g_hKv, path);
-		
-		decl String:map[64];
-		GetCurrentMap(map, sizeof(map));
-		
-		if(KvJumpToKey(g_hKv, map))
-		{
-			g_bSpawnMap = true;
+	decl String:map[64];
+	GetCurrentMap(map, sizeof(map));
+	
+	decl String:path[256];
+	BuildPath(Path_SM, path, sizeof(path), "configs/soap/%s.cfg", map);
+	
+	if(FileExists(path)) {
+		g_bSpawnMap = true;
+		FileToKeyValues(g_hKv, path);	
 			
-			decl String:players[4], Float:vectors[6], Float:origin[3], Float:angles[3];
-			new iplayers;
+		decl String:players[4], Float:vectors[6], Float:origin[3], Float:angles[3];
+		new iplayers;
+		
+		do {
+			KvGetSectionName(g_hKv, players, sizeof(players));
+			iplayers = StringToInt(players);
 			
-			do {
-				KvGetSectionName(g_hKv, players, sizeof(players));
-				iplayers = StringToInt(players);
-				
-				if(KvJumpToKey(g_hKv, "red"))
-				{
-					KvGotoFirstSubKey(g_hKv);
-					do {
-						KvGetVector(g_hKv, "origin", origin);
-						KvGetVector(g_hKv, "angles", angles);
-						
-						vectors[0] = origin[0];
-						vectors[1] = origin[1];
-						vectors[2] = origin[2];
-						vectors[3] = angles[0];
-						vectors[4] = angles[1];
-						vectors[5] = angles[2];
-						
-						for(new i=iplayers;i<MAXPLAYERS;i++)
-							PushArrayArray(GetArrayCell(g_hRedSpawns, i), vectors);
-					} while(KvGotoNextKey(g_hKv));
+			if(KvJumpToKey(g_hKv, "red"))
+			{
+				KvGotoFirstSubKey(g_hKv);
+				do {
+					KvGetVector(g_hKv, "origin", origin);
+					KvGetVector(g_hKv, "angles", angles);
 					
-					KvGoBack(g_hKv);
-					KvGoBack(g_hKv);
-				} else {
-					SetFailState("Red spawns missing. Map: %s  Players: %i", map, iplayers);
-				}
-				if(KvJumpToKey(g_hKv, "blue"))
-				{
-					KvGotoFirstSubKey(g_hKv);
-					do {
-						KvGetVector(g_hKv, "origin", origin);
-						KvGetVector(g_hKv, "angles", angles);
-						
-						vectors[0] = origin[0];
-						vectors[1] = origin[1];
-						vectors[2] = origin[2];
-						vectors[3] = angles[0];
-						vectors[4] = angles[1];
-						vectors[5] = angles[2];
-						
-						for(new i=iplayers;i<MAXPLAYERS;i++)
-							PushArrayArray(GetArrayCell(g_hBluSpawns, i), vectors);
-					} while(KvGotoNextKey(g_hKv));
-				} else {
-					SetFailState("Blue spawns missing. Map: %s  Players: %i", map, iplayers);
-				}
-			} while(KvGotoNextKey(g_hKv));
-		} else {
-			SetFailState("Map spawns missing. Map: %s", map);
-		}
+					vectors[0] = origin[0];
+					vectors[1] = origin[1];
+					vectors[2] = origin[2];
+					vectors[3] = angles[0];
+					vectors[4] = angles[1];
+					vectors[5] = angles[2];
+					
+					for(new i=iplayers;i<MAXPLAYERS;i++)
+						PushArrayArray(GetArrayCell(g_hRedSpawns, i), vectors);
+				} while(KvGotoNextKey(g_hKv));
+				
+				KvGoBack(g_hKv);
+				KvGoBack(g_hKv);
+			} else {
+				SetFailState("Red spawns missing. Map: %s  Players: %i", map, iplayers);
+			}
+			if(KvJumpToKey(g_hKv, "blue"))
+			{
+				KvGotoFirstSubKey(g_hKv);
+				do {
+					KvGetVector(g_hKv, "origin", origin);
+					KvGetVector(g_hKv, "angles", angles);
+					
+					vectors[0] = origin[0];
+					vectors[1] = origin[1];
+					vectors[2] = origin[2];
+					vectors[3] = angles[0];
+					vectors[4] = angles[1];
+					vectors[5] = angles[2];
+					
+					for(new i=iplayers;i<MAXPLAYERS;i++)
+						PushArrayArray(GetArrayCell(g_hBluSpawns, i), vectors);
+				} while(KvGotoNextKey(g_hKv));
+			} else {
+				SetFailState("Blue spawns missing. Map: %s  Players: %i", map, iplayers);
+			}
+		} while(KvGotoNextKey(g_hKv));
 	} else {
 		LogError("File Not Found: %s", path);
 	}
@@ -528,7 +521,7 @@ CreateTimeCheck()
 
 /* RandomSpawn()
  *
- * Picks a spawn point at random from soap.cfg, and teleports the player to it.
+ * Picks a spawn point at random from the %map%.cfg, and teleports the player to it.
  * -------------------------------------------------------------------------- */
 public Action:RandomSpawn(Handle:timer, any:clientid)
 {
