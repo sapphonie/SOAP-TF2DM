@@ -8,10 +8,10 @@
 #include <afk>
 
 // ====[ CONSTANTS ]===================================================
-#define PLUGIN_NAME		"SOAP TF2 Deathmatch (modified)"
-#define PLUGIN_AUTHOR		"Original:MikeJS, Lange, & Tondark Edited by: slate"
-#define PLUGIN_VERSION		"3.51"
-#define PLUGIN_CONTACT		"http://steamcommunity.com/id/sl8/"
+#define PLUGIN_NAME		"SOAP TF2 Deathmatch"
+#define PLUGIN_AUTHOR		"MikeJS, Lange, & Tondark"
+#define PLUGIN_VERSION		"3.6"
+#define PLUGIN_CONTACT		"http://www.mikejsavage.com/, http://steamcommunity.com/id/langeh/"
 
 // ====[ VARIABLES ]===================================================
 new bool:FirstLoad;
@@ -167,7 +167,7 @@ public OnLibraryRemoved(const String:name[]) {
 public Action:OnGetGameDescription(String:gameDesc[64])
 {
 	// Changes the game description from "Team Fortress 2" to "SOAP TF2DM vx.x")
-	Format(gameDesc, sizeof(gameDesc), "TF2 Deathmatch");
+	Format(gameDesc, sizeof(gameDesc), "SOAP TF2DM v%s",PLUGIN_VERSION);
 	return Plugin_Changed;
 }
 
