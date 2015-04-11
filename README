@@ -1,0 +1,1 @@
+Modified the SOAP TF2DM PLugin from MikeJS, Lange, & Tondark to load the spawns from map-specific configs in tf\addons\sourcemod\configs\soap\MAP.cfg.
