@@ -272,6 +272,7 @@ public OnMapStart()
 			}
 		} while(KvGotoNextKey(g_hKv));
 	} else {
+		SetFailState("Map spawns missing. Map: %s", map);
 		LogError("File Not Found: %s", path);
 	}
 	// End spawn system.
