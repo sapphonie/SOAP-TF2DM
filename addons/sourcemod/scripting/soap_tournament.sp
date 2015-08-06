@@ -49,6 +49,10 @@ public OnPluginStart()
 	
 	//HookEvent("teamplay_round_restart_seconds", Event_TeamplayRestartSeconds);
 	HookEvent("tournament_stateupdate", Event_TournamentStateupdate); 
+
+	//Hook for event spammed when mp_tournament_readymode 1
+	//There doesn't seem to be any way players can cancel the countdown once it starts, so no need to worry about reloading SOAP if that happens
+	HookEvent("tournament_enablecountdown", Event_TournamentEnableCountdown, EventHookMode_PostNoCopy);
 	
 	StartDeathmatching();
 }
@@ -112,6 +116,14 @@ public Event_TournamentStateupdate(Handle:event, const String:name[], bool:dontB
 		} else { // One or more of the teams isn't ready, StartDeathmatching.
 			StartDeathmatching();
 		}
+	}
+}
+
+public Event_TournamentEnableCountdown(Handle:event, const String:name[], bool:dontBroadcast)
+{
+	if(g_dm == true)
+	{
+		StopDeathmatching();
 	}
 }
 
