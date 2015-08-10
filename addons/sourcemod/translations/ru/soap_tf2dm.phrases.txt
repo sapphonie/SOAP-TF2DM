@@ -2,7 +2,6 @@
 {
 	"Health Remaining"
 	{
-		"#format"		"{1:i}"
 		"ru"			"У противника осталось {1} хп."
 	}
 	"Attacker is dead"

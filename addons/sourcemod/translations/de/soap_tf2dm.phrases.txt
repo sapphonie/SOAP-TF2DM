@@ -2,7 +2,6 @@
 {
 	"Health Remaining"
 	{
-		"#format"		"{1:i}"
 		"de"			"Dein Gegner überlebte mit {1} HP."
 	}
 	"Attacker is dead"
