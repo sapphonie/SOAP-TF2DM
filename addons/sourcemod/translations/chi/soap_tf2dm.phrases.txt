@@ -1,0 +1,27 @@
+"Phrases"
+{
+	"Health Remaining"
+	{
+		"chi"			"对手还剩 {1} HP。"
+	}
+	"Attacker is dead"
+	{
+		"chi"			"你的对手死掉了。"
+	}
+	"Plugins unloaded"
+	{
+		"chi"			"插件已卸载。"
+	}
+	"Plugins reloaded"
+	{
+		"chi"			"插件已重新载入。"
+	}
+	"Kill HP Received"
+	{
+		"chi"			"你杀死了 {2}，因此获得 {1} HP"
+	}
+	"Damage HP Received"
+	{
+		"chi"			"你对 {2} 造成了伤害，因此获得 {1} HP"
+	}
+}
