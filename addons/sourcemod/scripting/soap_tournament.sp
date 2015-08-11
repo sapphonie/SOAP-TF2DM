@@ -25,6 +25,10 @@ public Plugin:myinfo =
 new bool:teamReadyState[2] = { false, false },
 	bool:g_dm = false;
 
+ConVar g_cvReadyModeCountdown;
+ConVar g_cvEnforceReadyModeCountdown;
+
+
 // ====[ FUNCTIONS ]===================================================
 
 /* OnPluginStart()
@@ -53,6 +57,12 @@ public OnPluginStart()
 	//Hook for event spammed when mp_tournament_readymode 1
 	//There doesn't seem to be any way players can cancel the countdown once it starts, so no need to worry about reloading SOAP if that happens
 	HookEvent("tournament_enablecountdown", Event_TournamentEnableCountdown, EventHookMode_PostNoCopy);
+
+	g_cvEnforceReadyModeCountdown = CreateConVar("soap_enforce_readymode_countdown", "1", "Set as 1 to keep mp_tournament_readymode_countdown 5 so P-Rec works properly", _, true, 0.0, true, 1.0);
+	g_cvReadyModeCountdown = FindConVar("mp_tournament_readymode_countdown");
+	SetConVarInt(g_cvReadyModeCountdown, 5, true, true);
+	HookConVarChange(g_cvEnforceReadyModeCountdown, handler_ConVarChange);
+	HookConVarChange(g_cvReadyModeCountdown, handler_ConVarChange);
 	
 	StartDeathmatching();
 }
@@ -140,4 +150,16 @@ public Action:TournamentRestartHook(args)
 	teamReadyState[1] = false;
 	StartDeathmatching();
 	return Plugin_Continue;
+}
+
+public handler_ConVarChange(Handle:convar, const String:oldValue[], const String:newValue[])
+{
+	if(convar == g_cvReadyModeCountdown && GetConVarBool(g_cvEnforceReadyModeCountdown))
+	{
+		SetConVarInt(g_cvReadyModeCountdown, 5, true, true);
+	}
+	if(convar == g_cvEnforceReadyModeCountdown && StringToInt(newValue) == 1)
+	{
+		SetConVarInt(g_cvReadyModeCountdown, 5, true, true);
+	}
 }
