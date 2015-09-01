@@ -58,9 +58,9 @@ new Handle:g_hForceTimeLimit = INVALID_HANDLE,
 	bool:g_bForceTimeLimit,
 	Handle:g_tCheckTimeLeft = INVALID_HANDLE;
 	
-//Doors
-new Handle:g_hOpenDoors = INVALID_HANDLE,
-	bool:g_bOpenDoors;
+//Doors and cabinets
+new Handle:g_hOpenDoors = INVALID_HANDLE, Handle:g_hDisableCabinet = INVALID_HANDLE,
+	bool:g_bOpenDoors, bool:g_bDisableCabinet;
 
 //Regen damage given on kill
 #define RECENT_DAMAGE_SECONDS 10
@@ -105,6 +105,7 @@ public OnPluginStart()
 	g_hKillHealStatic = CreateConVar("soap_kill_heal_static", "0", "Amount of HP to restore on kills. Exact value applied the same to all classes. Should not be used with soap_kill_heal_ratio.", FCVAR_PLUGIN|FCVAR_NOTIFY);
 	g_hKillAmmo = CreateConVar("soap_kill_ammo", "1", "Enable ammo restoration on kills.", FCVAR_PLUGIN|FCVAR_NOTIFY);
 	g_hOpenDoors = CreateConVar("soap_opendoors", "1", "Force all doors to open. Required on maps like cp_well.", FCVAR_PLUGIN|FCVAR_NOTIFY);
+	g_hDisableCabinet = CreateConVar("soap_disablecabinet", "1", "Disables the resupply cabinets on map load", FCVAR_NOTIFY);
 	g_hShowHP = CreateConVar("soap_showhp", "1", "Print killer's health to victim on death.", FCVAR_PLUGIN|FCVAR_NOTIFY);
 	g_hForceTimeLimit  = CreateConVar("soap_forcetimelimit", "1", "Time limit enforcement, used to fix a never-ending round issue on gravelpit.", _, true, 0.0, true, 1.0);
 	
@@ -120,6 +121,7 @@ public OnPluginStart()
 	HookConVarChange(g_hKillHealStatic, handler_ConVarChange);
 	HookConVarChange(g_hKillAmmo, handler_ConVarChange);
 	HookConVarChange(g_hOpenDoors, handler_ConVarChange);
+	HookConVarChange(g_hDisableCabinet, handler_ConVarChange);
 	HookConVarChange(g_hShowHP, handler_ConVarChange);
 	HookConVarChange(g_hForceTimeLimit, handler_ConVarChange);
 	HookEvent("player_death", Event_player_death);
@@ -327,6 +329,7 @@ public OnConfigsExecuted()
 	g_iKillHealStatic = GetConVarInt(g_hKillHealStatic);
 	g_bKillAmmo = GetConVarBool(g_hKillAmmo);
 	g_bOpenDoors = GetConVarBool(g_hOpenDoors);
+	g_bDisableCabinet = GetConVarBool(g_hDisableCabinet);
 	g_bShowHP = GetConVarBool(g_hShowHP);
 	g_bForceTimeLimit = GetConVarBool(g_hForceTimeLimit);
 }
@@ -417,6 +420,12 @@ public handler_ConVarChange(Handle:convar, const String:oldValue[], const String
 			g_bOpenDoors = true;
 		else if(StringToInt(newValue) <= 0)
 			g_bOpenDoors = false;
+	}
+	else if (convar == g_hDisableCabinet) {
+		if(StringToInt(newValue) >= 1)
+			g_bDisableCabinet = true;
+		else if(StringToInt(newValue) <= 0)
+			g_bDisableCabinet = false;
 	}
 	else if (convar == g_hShowHP) {
 		if(StringToInt(newValue) >= 1)
@@ -670,8 +679,11 @@ public Action:Regen(Handle:timer, any:clientid)
 		new health = GetClientHealth(client)+g_iRegenHP;
 		if(health>g_iMaxHealth[client])
 			health = g_iMaxHealth[client]; // If the regen would give the client more than their max hp, just set it to max.
-		SetEntProp(client, Prop_Send, "m_iHealth", health, 1);
-		SetEntProp(client, Prop_Data, "m_iHealth", health, 1);
+		if(GetClientHealth(client) <= g_iMaxHealth[client])
+		{
+			SetEntProp(client, Prop_Send, "m_iHealth", health, 1);
+			SetEntProp(client, Prop_Data, "m_iHealth", health, 1);
+		}
 		
 		g_hRegenTimer[client] = CreateTimer(g_fRegenTick, Regen, clientid); // Call this function again in g_fRegenTick seconds.
 	}
@@ -1020,7 +1032,7 @@ LockMap()
 	for(new i = 0; i < sizeof(saRemove); i++)
 	{
 		new ent = MAXPLAYERS+1;
-		while((ent = FindEntityByClassname2(ent, saRemove[i])) != -1)
+		while((ent = FindEntityByClassname2(ent, saRemove[i])) != -1 && (!StrEqual(saRemove[i], "func_regenerate", false) || g_bDisableCabinet))
 		{
 			if(IsValidEdict(ent))
 				AcceptEntityInput(ent, "Disable");
