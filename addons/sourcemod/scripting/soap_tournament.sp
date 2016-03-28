@@ -25,7 +25,7 @@ public Plugin:myinfo =
 new bool:teamReadyState[2] = { false, false },
 	bool:g_dm = false,
 	Handle:playersReady,
-	Handle:g_readymode_team_size;
+	Handle:g_readymode_min;
 
 ConVar g_cvReadyModeCountdown;
 ConVar g_cvEnforceReadyModeCountdown;
@@ -64,7 +64,7 @@ public OnPluginStart()
 
 	g_cvEnforceReadyModeCountdown = CreateConVar("soap_enforce_readymode_countdown", "1", "Set as 1 to keep mp_tournament_readymode_countdown 5 so P-Rec works properly", _, true, 0.0, true, 1.0);
 	g_cvReadyModeCountdown = FindConVar("mp_tournament_readymode_countdown");
-	g_readymode_team_size = FindConVar("mp_tournament_readymode_team_size");
+	g_readymode_min = FindConVar("mp_tournament_readymode_min");
 	SetConVarInt(g_cvReadyModeCountdown, 5, true, true);
 	HookConVarChange(g_cvEnforceReadyModeCountdown, handler_ConVarChange);
 	HookConVarChange(g_cvReadyModeCountdown, handler_ConVarChange);
@@ -174,8 +174,7 @@ public handler_ConVarChange(Handle:convar, const String:oldValue[], const String
 public Action:Listener_TournamentPlayerReadystate(client, const String:command[], args)
 {
 	decl String:arg[4];
-	new total_size = GetConVarInt(g_readymode_team_size) * 2,
-		clientid = GetClientUserId(client);
+	new clientid = GetClientUserId(client);
 	GetCmdArg(1, arg, sizeof(arg));
 	if (StrEqual(arg, "1"))
 	{
@@ -184,7 +183,7 @@ public Action:Listener_TournamentPlayerReadystate(client, const String:command[]
 	{
 		RemoveFromArray(playersReady, FindValueInArray(playersReady, clientid));
 	}
-	if (GetArraySize(playersReady) == total_size)
+	if (GetArraySize(playersReady) == GetConVarInt(g_readymode_min) * 2)
 	{
 		StopDeathmatching();
 	}
