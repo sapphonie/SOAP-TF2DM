@@ -23,7 +23,10 @@ public Plugin:myinfo =
 // ====[ VARIABLES ]===================================================
 
 new bool:teamReadyState[2] = { false, false },
-	bool:g_dm = false;
+	bool:g_dm = false,
+	Handle:redPlayersReady,
+	Handle:bluePlayersReady,
+	Handle:g_readymode_min;
 
 ConVar g_cvReadyModeCountdown;
 ConVar g_cvEnforceReadyModeCountdown;
@@ -54,16 +57,22 @@ public OnPluginStart()
 	//HookEvent("teamplay_round_restart_seconds", Event_TeamplayRestartSeconds);
 	HookEvent("tournament_stateupdate", Event_TournamentStateupdate); 
 
-	//Hook for event spammed when mp_tournament_readymode 1
-	//There doesn't seem to be any way players can cancel the countdown once it starts, so no need to worry about reloading SOAP if that happens
-	HookEvent("tournament_enablecountdown", Event_TournamentEnableCountdown, EventHookMode_PostNoCopy);
+	// Hook for events when player changes their team.
+	HookEvent("player_team", Event_PlayerTeam);
+
+	// Listen for player readying or unreadying.
+	AddCommandListener(Listener_TournamentPlayerReadystate, "tournament_player_readystate");
 
 	g_cvEnforceReadyModeCountdown = CreateConVar("soap_enforce_readymode_countdown", "1", "Set as 1 to keep mp_tournament_readymode_countdown 5 so P-Rec works properly", _, true, 0.0, true, 1.0);
 	g_cvReadyModeCountdown = FindConVar("mp_tournament_readymode_countdown");
+	g_readymode_min = FindConVar("mp_tournament_readymode_min");
 	SetConVarInt(g_cvReadyModeCountdown, 5, true, true);
 	HookConVarChange(g_cvEnforceReadyModeCountdown, handler_ConVarChange);
 	HookConVarChange(g_cvReadyModeCountdown, handler_ConVarChange);
 	
+	redPlayersReady = CreateArray();
+	bluePlayersReady = CreateArray();
+
 	StartDeathmatching();
 }
 
@@ -88,6 +97,8 @@ StopDeathmatching()
 	{
 		ServerCommand("exec sourcemod/soap_live.cfg");
 		PrintToChatAll("[SOAP] %t", "Plugins unloaded");
+		ClearArray(redPlayersReady);
+		ClearArray(bluePlayersReady);
 		g_dm = false;
 	}
 }
@@ -102,6 +113,8 @@ StartDeathmatching()
 	{
 		ServerCommand("exec sourcemod/soap_notlive.cfg");
 		PrintToChatAll("[SOAP] %t", "Plugins reloaded");
+		ClearArray(redPlayersReady);
+		ClearArray(bluePlayersReady);
 		g_dm = true;
 	}
 }
@@ -129,12 +142,10 @@ public Event_TournamentStateupdate(Handle:event, const String:name[], bool:dontB
 	}
 }
 
-public Event_TournamentEnableCountdown(Handle:event, const String:name[], bool:dontBroadcast)
+public Event_PlayerTeam(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	if(g_dm == true)
-	{
-		StopDeathmatching();
-	}
+	new clientid = GetEventInt(event, "userid");
+	RemoveFromArray(redPlayersReady, FindValueInArray(redPlayersReady, clientid));
 }
 
 public GameOverEvent(Handle:event, const String:name[], bool:dontBroadcast)
@@ -161,5 +172,34 @@ public handler_ConVarChange(Handle:convar, const String:oldValue[], const String
 	if(convar == g_cvEnforceReadyModeCountdown && StringToInt(newValue) == 1)
 	{
 		SetConVarInt(g_cvReadyModeCountdown, 5, true, true);
+	}
+}
+
+public Action:Listener_TournamentPlayerReadystate(client, const String:command[], args)
+{
+	decl String:arg[4];
+	new min = GetConVarInt(g_readymode_min), clientid = GetClientUserId(client);
+	GetCmdArg(1, arg, sizeof(arg));
+	if (StrEqual(arg, "1"))
+	{
+		if (GetClientTeam(client) - TEAM_OFFSET == 0)
+		{
+			PushArrayCell(redPlayersReady, clientid);
+		} else if (GetClientTeam(client) - TEAM_OFFSET == 1)
+		{
+			PushArrayCell(bluePlayersReady, clientid);
+		}
+	} else if (StrEqual(arg, "0"))
+	{
+		if (GetClientTeam(client) - TEAM_OFFSET == 0)
+		{
+			RemoveFromArray(redPlayersReady, FindValueInArray(redPlayersReady, clientid));
+		} else if (GetClientTeam(client) - TEAM_OFFSET == 1)
+		{
+			RemoveFromArray(bluePlayersReady, FindValueInArray(bluePlayersReady, clientid));
+		}
+	}
+	if (GetArraySize(redPlayersReady) == min && GetArraySize(bluePlayersReady) == min)
+		StopDeathmatching();
 	}
 }
