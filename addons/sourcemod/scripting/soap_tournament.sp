@@ -24,7 +24,8 @@ public Plugin:myinfo =
 
 new bool:teamReadyState[2] = { false, false },
 	bool:g_dm = false,
-	Handle:playersReady,
+	Handle:redPlayersReady,
+	Handle:bluePlayersReady,
 	Handle:g_readymode_min;
 
 ConVar g_cvReadyModeCountdown;
@@ -69,7 +70,8 @@ public OnPluginStart()
 	HookConVarChange(g_cvEnforceReadyModeCountdown, handler_ConVarChange);
 	HookConVarChange(g_cvReadyModeCountdown, handler_ConVarChange);
 	
-	playersReady = CreateArray();
+	redPlayersReady = CreateArray();
+	bluePlayersReady = CreateArray();
 
 	StartDeathmatching();
 }
@@ -95,7 +97,8 @@ StopDeathmatching()
 	{
 		ServerCommand("exec sourcemod/soap_live.cfg");
 		PrintToChatAll("[SOAP] %t", "Plugins unloaded");
-		ClearArray(playersReady);
+		ClearArray(redPlayersReady);
+		ClearArray(bluePlayersReady);
 		g_dm = false;
 	}
 }
@@ -110,7 +113,8 @@ StartDeathmatching()
 	{
 		ServerCommand("exec sourcemod/soap_notlive.cfg");
 		PrintToChatAll("[SOAP] %t", "Plugins reloaded");
-		ClearArray(playersReady);
+		ClearArray(redPlayersReady);
+		ClearArray(bluePlayersReady);
 		g_dm = true;
 	}
 }
@@ -141,7 +145,7 @@ public Event_TournamentStateupdate(Handle:event, const String:name[], bool:dontB
 public Event_PlayerTeam(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	new clientid = GetEventInt(event, "userid");
-	RemoveFromArray(playersReady, FindValueInArray(playersReady, clientid));
+	RemoveFromArray(redPlayersReady, FindValueInArray(redPlayersReady, clientid));
 }
 
 public GameOverEvent(Handle:event, const String:name[], bool:dontBroadcast)
@@ -174,17 +178,28 @@ public handler_ConVarChange(Handle:convar, const String:oldValue[], const String
 public Action:Listener_TournamentPlayerReadystate(client, const String:command[], args)
 {
 	decl String:arg[4];
-	new clientid = GetClientUserId(client);
+	new min = GetConVarInt(g_readymode_min), clientid = GetClientUserId(client);
 	GetCmdArg(1, arg, sizeof(arg));
 	if (StrEqual(arg, "1"))
 	{
-		PushArrayCell(playersReady, clientid);
+		if (GetClientTeam(client) - TEAM_OFFSET == 0)
+		{
+			PushArrayCell(redPlayersReady, clientid);
+		} else if (GetClientTeam(client) - TEAM_OFFSET == 1)
+		{
+			PushArrayCell(bluePlayersReady, clientid);
+		}
 	} else if (StrEqual(arg, "0"))
 	{
-		RemoveFromArray(playersReady, FindValueInArray(playersReady, clientid));
+		if (GetClientTeam(client) - TEAM_OFFSET == 0)
+		{
+			RemoveFromArray(redPlayersReady, FindValueInArray(redPlayersReady, clientid));
+		} else if (GetClientTeam(client) - TEAM_OFFSET == 1)
+		{
+			RemoveFromArray(bluePlayersReady, FindValueInArray(bluePlayersReady, clientid));
+		}
 	}
-	if (GetArraySize(playersReady) == GetConVarInt(g_readymode_min) * 2)
-	{
+	if (GetArraySize(redPlayersReady) == min && GetArraySize(bluePlayersReady) == min)
 		StopDeathmatching();
 	}
 }
