@@ -93,20 +93,20 @@ public OnPluginStart()
 	
 	LoadTranslations("soap_tf2dm.phrases");
 	// Create convars
-	CreateConVar("soap", PLUGIN_VERSION, PLUGIN_NAME, FCVAR_PLUGIN|FCVAR_REPLICATED);
-	g_hRegenHP = CreateConVar("soap_regenhp", "1", "Health added per regeneration tick. Set to 0 to disable.", FCVAR_PLUGIN|FCVAR_NOTIFY);
-	g_hRegenTick = CreateConVar("soap_regentick", "0.1", "Delay between regeration ticks.", FCVAR_PLUGIN|FCVAR_NOTIFY);
-	g_hRegenDelay = CreateConVar("soap_regendelay", "5.0", "Seconds after damage before regeneration.", FCVAR_PLUGIN|FCVAR_NOTIFY);
-	g_hKillStartRegen = CreateConVar("soap_kill_start_regen", "1", "Start the heal-over-time regen immediately after a kill.", FCVAR_PLUGIN|FCVAR_NOTIFY);
-	g_hSpawn = CreateConVar("soap_spawn_delay", "1.5", "Spawn timer.", FCVAR_PLUGIN|FCVAR_NOTIFY);
-	g_hSpawnRandom = CreateConVar("soap_spawnrandom", "1", "Enable random spawns.", FCVAR_PLUGIN|FCVAR_NOTIFY);
-	g_hKillHealRatio = CreateConVar("soap_kill_heal_ratio", "0.5", "Percentage of HP to restore on kills. .5 = 50%. Should not be used with soap_kill_heal_static.", FCVAR_PLUGIN|FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_hDamageHealRatio = CreateConVar("soap_dmg_heal_ratio", "0.0", "Percentage of HP to restore based on amount of damage given. .5 = 50%. Should not be used with soap_kill_heal_static.", FCVAR_PLUGIN|FCVAR_NOTIFY, true, 0.0, true, 1.0);
-	g_hKillHealStatic = CreateConVar("soap_kill_heal_static", "0", "Amount of HP to restore on kills. Exact value applied the same to all classes. Should not be used with soap_kill_heal_ratio.", FCVAR_PLUGIN|FCVAR_NOTIFY);
-	g_hKillAmmo = CreateConVar("soap_kill_ammo", "1", "Enable ammo restoration on kills.", FCVAR_PLUGIN|FCVAR_NOTIFY);
-	g_hOpenDoors = CreateConVar("soap_opendoors", "1", "Force all doors to open. Required on maps like cp_well.", FCVAR_PLUGIN|FCVAR_NOTIFY);
+	CreateConVar("soap", PLUGIN_VERSION, PLUGIN_NAME, FCVAR_REPLICATED);
+	g_hRegenHP = CreateConVar("soap_regenhp", "1", "Health added per regeneration tick. Set to 0 to disable.", FCVAR_NOTIFY);
+	g_hRegenTick = CreateConVar("soap_regentick", "0.1", "Delay between regeration ticks.", FCVAR_NOTIFY);
+	g_hRegenDelay = CreateConVar("soap_regendelay", "5.0", "Seconds after damage before regeneration.", FCVAR_NOTIFY);
+	g_hKillStartRegen = CreateConVar("soap_kill_start_regen", "1", "Start the heal-over-time regen immediately after a kill.", FCVAR_NOTIFY);
+	g_hSpawn = CreateConVar("soap_spawn_delay", "1.5", "Spawn timer.", FCVAR_NOTIFY);
+	g_hSpawnRandom = CreateConVar("soap_spawnrandom", "1", "Enable random spawns.", FCVAR_NOTIFY);
+	g_hKillHealRatio = CreateConVar("soap_kill_heal_ratio", "0.5", "Percentage of HP to restore on kills. .5 = 50%. Should not be used with soap_kill_heal_static.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_hDamageHealRatio = CreateConVar("soap_dmg_heal_ratio", "0.0", "Percentage of HP to restore based on amount of damage given. .5 = 50%. Should not be used with soap_kill_heal_static.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+	g_hKillHealStatic = CreateConVar("soap_kill_heal_static", "0", "Amount of HP to restore on kills. Exact value applied the same to all classes. Should not be used with soap_kill_heal_ratio.", FCVAR_NOTIFY);
+	g_hKillAmmo = CreateConVar("soap_kill_ammo", "1", "Enable ammo restoration on kills.", FCVAR_NOTIFY);
+	g_hOpenDoors = CreateConVar("soap_opendoors", "1", "Force all doors to open. Required on maps like cp_well.", FCVAR_NOTIFY);
 	g_hDisableCabinet = CreateConVar("soap_disablecabinet", "1", "Disables the resupply cabinets on map load", FCVAR_NOTIFY);
-	g_hShowHP = CreateConVar("soap_showhp", "1", "Print killer's health to victim on death.", FCVAR_PLUGIN|FCVAR_NOTIFY);
+	g_hShowHP = CreateConVar("soap_showhp", "1", "Print killer's health to victim on death.", FCVAR_NOTIFY);
 	g_hForceTimeLimit  = CreateConVar("soap_forcetimelimit", "1", "Time limit enforcement, used to fix a never-ending round issue on gravelpit.", _, true, 0.0, true, 1.0);
 	
 	// Hook convar changes and events
