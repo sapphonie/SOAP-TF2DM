@@ -61,6 +61,10 @@ new Handle:g_hForceTimeLimit = INVALID_HANDLE,
 //Doors and cabinets
 new Handle:g_hOpenDoors = INVALID_HANDLE, Handle:g_hDisableCabinet = INVALID_HANDLE,
 	bool:g_bOpenDoors, bool:g_bDisableCabinet;
+	
+//Health packs and ammo
+new Handle:g_hDisableHealthPacks = INVALID_HANDLE, Handle:g_hDisableAmmoPacks = INVALID_HANDLE,
+	bool:g_bDisableHealthPacks, bool:g_bDisableAmmoPacks;
 
 //Regen damage given on kill
 #define RECENT_DAMAGE_SECONDS 10
@@ -108,6 +112,8 @@ public OnPluginStart()
 	g_hDisableCabinet = CreateConVar("soap_disablecabinet", "1", "Disables the resupply cabinets on map load", FCVAR_NOTIFY);
 	g_hShowHP = CreateConVar("soap_showhp", "1", "Print killer's health to victim on death.", FCVAR_NOTIFY);
 	g_hForceTimeLimit  = CreateConVar("soap_forcetimelimit", "1", "Time limit enforcement, used to fix a never-ending round issue on gravelpit.", _, true, 0.0, true, 1.0);
+	g_hDisableHealthPacks = CreateConVar("soap_disablehealthpacks", "0", "Disables the health packs on map load.", FCVAR_NOTIFY);
+	g_hDisableAmmoPacks = CreateConVar("soap_disableammopacks", "0", "Disables the ammo packs on map load.", FCVAR_NOTIFY);
 	
 	// Hook convar changes and events
 	HookConVarChange(g_hRegenHP, handler_ConVarChange);
@@ -124,6 +130,8 @@ public OnPluginStart()
 	HookConVarChange(g_hDisableCabinet, handler_ConVarChange);
 	HookConVarChange(g_hShowHP, handler_ConVarChange);
 	HookConVarChange(g_hForceTimeLimit, handler_ConVarChange);
+	HookConVarChange(g_hDisableHealthPacks, handler_ConVarChange);
+	HookConVarChange(g_hDisableAmmoPacks, handler_ConVarChange);
 	HookEvent("player_death", Event_player_death);
 	HookEvent("player_hurt", Event_player_hurt);
 	HookEvent("player_spawn", Event_player_spawn);
@@ -332,6 +340,8 @@ public OnConfigsExecuted()
 	g_bDisableCabinet = GetConVarBool(g_hDisableCabinet);
 	g_bShowHP = GetConVarBool(g_hShowHP);
 	g_bForceTimeLimit = GetConVarBool(g_hForceTimeLimit);
+	g_bDisableHealthPacks = GetConVarBool(g_hDisableHealthPacks);
+	g_bDisableAmmoPacks = GetConVarBool(g_hDisableAmmoPacks);
 }
 
 
@@ -432,6 +442,18 @@ public handler_ConVarChange(Handle:convar, const String:oldValue[], const String
 			g_bShowHP = true;
 		else if(StringToInt(newValue) <= 0)
 			g_bShowHP = false;
+	}
+	else if (convar == g_hDisableHealthPacks) {
+		if(StringToInt(newValue) >= 1)
+			g_bDisableHealthPacks = true;
+		else if(StringToInt(newValue) <= 0)
+			g_bDisableHealthPacks = false;
+	}
+	else if (convar == g_hDisableAmmoPacks) {
+		if(StringToInt(newValue) >= 1)
+			g_bDisableAmmoPacks = true;
+		else if(StringToInt(newValue) <= 0)
+			g_bDisableAmmoPacks = false;
 	}
 }
 
@@ -1026,13 +1048,19 @@ LockMap()
 									"tf_logic_koth",
 									"logic_auto",
 									"logic_relay",
-									"item_teamflag"
+									"item_teamflag",
+									"item_healthkit_full",
+									"item_healthkit_medium",
+									"item_healthkit_small",
+									"item_ammopack_full",
+									"item_ammopack_medium",
+									"item_ammopack_small"
 									};
 								
 	for(new i = 0; i < sizeof(saRemove); i++)
 	{
 		new ent = MAXPLAYERS+1;
-		while((ent = FindEntityByClassname2(ent, saRemove[i])) != -1 && (!StrEqual(saRemove[i], "func_regenerate", false) || g_bDisableCabinet))
+		while((ent = FindEntityByClassname2(ent, saRemove[i])) != -1 && (!StrEqual(saRemove[i], "func_regenerate", false) || g_bDisableCabinet) && (StrContains(saRemove[i], "item_healthkit", false) == -1 || g_bDisableHealthPacks) && (StrContains(saRemove[i], "item_ammopack", false) == -1 || g_bDisableAmmoPacks))
 		{
 			if(IsValidEdict(ent))
 				AcceptEntityInput(ent, "Disable");
