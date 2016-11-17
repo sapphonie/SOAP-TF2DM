@@ -1,0 +1,4 @@
+/addons/sourcemod/scripting/include/
+!/addons/sourcemod/scripting/include/afk.inc
+!/addons/sourcemod/scripting/include/updater.inc
+spcomp.exe
