@@ -59,11 +59,11 @@ new g_iMaxClips1[MAXPLAYERS+1],
 new Handle:g_hForceTimeLimit = INVALID_HANDLE,
 	bool:g_bForceTimeLimit,
 	Handle:g_tCheckTimeLeft = INVALID_HANDLE;
-	
+
 //Doors and cabinets
 new Handle:g_hOpenDoors = INVALID_HANDLE, Handle:g_hDisableCabinet = INVALID_HANDLE,
 	bool:g_bOpenDoors, bool:g_bDisableCabinet;
-	
+
 //Health packs and ammo
 new Handle:g_hDisableHealthPacks = INVALID_HANDLE, Handle:g_hDisableAmmoPacks = INVALID_HANDLE,
 	bool:g_bDisableHealthPacks, bool:g_bDisableAmmoPacks;
@@ -96,10 +96,10 @@ public Plugin:myinfo =
 public OnPluginStart()
 {
 	g_bAFKSupported = LibraryExists("afk");
-	
+
 	if (LibraryExists("updater"))
         Updater_AddPlugin(UPDATE_URL);
-	
+
 	LoadTranslations("soap_tf2dm.phrases");
 	// Create convars
 	CreateConVar("soap", PLUGIN_VERSION, PLUGIN_NAME, FCVAR_REPLICATED);
@@ -119,7 +119,7 @@ public OnPluginStart()
 	g_hForceTimeLimit  = CreateConVar("soap_forcetimelimit", "1", "Time limit enforcement, used to fix a never-ending round issue on gravelpit.", _, true, 0.0, true, 1.0);
 	g_hDisableHealthPacks = CreateConVar("soap_disablehealthpacks", "0", "Disables the health packs on map load.", FCVAR_NOTIFY);
 	g_hDisableAmmoPacks = CreateConVar("soap_disableammopacks", "0", "Disables the ammo packs on map load.", FCVAR_NOTIFY);
-	
+
 	// Hook convar changes and events
 	HookConVarChange(g_hRegenHP, handler_ConVarChange);
 	HookConVarChange(g_hRegenTick, handler_ConVarChange);
@@ -147,19 +147,19 @@ public OnPluginStart()
 	// Create arrays for the spawning system
 	g_hRedSpawns = CreateArray();
 	g_hBluSpawns = CreateArray();
-	
+
 	// Crutch to fix some issues that appear when the plugin is loaded mid-round.
 	FirstLoad = true;
-	
+
 	// Begin the time check that prevents infinite rounds on A/D and KOTH maps. It is run here as well as in OnMapStart() so that it will still work even if the plugin is loaded mid-round.
 	CreateTimeCheck();
-	
+
 	// Lock control points and intel on map. Also respawn all players into DM spawns. This instance of LockMap() is needed for mid-round loads of DM. (See: Volt's DM/Pub hybrid server.)
 	LockMap();
-	
+
 	// Reset all player's regens. Used here for mid-round loading compatability.
 	ResetPlayers();
-	
+
 	// Create configuration file in cfg/sourcemod folder
 	AutoExecConfig(true, "soap_tf2dm", "sourcemod");
 }
@@ -168,7 +168,7 @@ public OnLibraryAdded(const String:name[]) {
 	// Set up auto updater
 	if (StrEqual(name, "afk"))
 		g_bAFKSupported = true;
-	
+
 	if (StrEqual(name, "updater"))
 		Updater_AddPlugin(UPDATE_URL);
 }
@@ -201,68 +201,68 @@ public OnMapStart()
 		KillTimer(g_tCheckTimeLeft);
 		g_tCheckTimeLeft = INVALID_HANDLE;
 	}
-	
+
 	for (new i = 0; i < MaxClients+1; i++)
-	{	
+	{
 		if(g_hRegenTimer[i]!=INVALID_HANDLE)
 		{
 			KillTimer(g_hRegenTimer[i]);
 			g_hRegenTimer[i] = INVALID_HANDLE;
 		}
 	}
-	
+
 	// Spawn system written by MikeJS.
 	ClearArray(g_hRedSpawns);
 	ClearArray(g_hBluSpawns);
-	
+
 	for(new i=0;i<MAXPLAYERS;i++)
 	{
 		PushArrayCell(g_hRedSpawns, CreateArray(6));
 		PushArrayCell(g_hBluSpawns, CreateArray(6));
 	}
-	
+
 	g_bSpawnMap = false;
-	
+
 	if(g_hKv!=INVALID_HANDLE)
 		CloseHandle(g_hKv);
-		
+
 	g_hKv = CreateKeyValues("Spawns");
-	
+
 	decl String:map[64];
 	GetCurrentMap(map, sizeof(map));
-	
+
 	decl String:path[256];
 	BuildPath(Path_SM, path, sizeof(path), "configs/soap/%s.cfg", map);
-	
+
 	if(FileExists(path)) {
 		g_bSpawnMap = true;
-		FileToKeyValues(g_hKv, path);	
-			
+		FileToKeyValues(g_hKv, path);
+
 		decl String:players[4], Float:vectors[6], Float:origin[3], Float:angles[3];
 		new iplayers;
-		
+
 		do {
 			KvGetSectionName(g_hKv, players, sizeof(players));
 			iplayers = StringToInt(players);
-			
+
 			if(KvJumpToKey(g_hKv, "red"))
 			{
 				KvGotoFirstSubKey(g_hKv);
 				do {
 					KvGetVector(g_hKv, "origin", origin);
 					KvGetVector(g_hKv, "angles", angles);
-					
+
 					vectors[0] = origin[0];
 					vectors[1] = origin[1];
 					vectors[2] = origin[2];
 					vectors[3] = angles[0];
 					vectors[4] = angles[1];
 					vectors[5] = angles[2];
-					
+
 					for(new i=iplayers;i<MAXPLAYERS;i++)
 						PushArrayArray(GetArrayCell(g_hRedSpawns, i), vectors);
 				} while(KvGotoNextKey(g_hKv));
-				
+
 				KvGoBack(g_hKv);
 				KvGoBack(g_hKv);
 			} else {
@@ -274,14 +274,14 @@ public OnMapStart()
 				do {
 					KvGetVector(g_hKv, "origin", origin);
 					KvGetVector(g_hKv, "angles", angles);
-					
+
 					vectors[0] = origin[0];
 					vectors[1] = origin[1];
 					vectors[2] = origin[2];
 					vectors[3] = angles[0];
 					vectors[4] = angles[1];
 					vectors[5] = angles[2];
-					
+
 					for(new i=iplayers;i<MAXPLAYERS;i++)
 						PushArrayArray(GetArrayCell(g_hBluSpawns, i), vectors);
 				} while(KvGotoNextKey(g_hKv));
@@ -294,10 +294,10 @@ public OnMapStart()
 		LogError("File Not Found: %s", path);
 	}
 	// End spawn system.
-	
+
 	// Load the sound file played when a player is spawned.
 	PrecacheSound("items/spawn_item.wav", true);
-	
+
 	// Begin the time check that prevents infinite rounds on A/D and KOTH maps.
 	CreateTimeCheck();
 }
@@ -307,17 +307,17 @@ public OnMapStart()
  * When the map ends.
  * -------------------------------------------------------------------------- */
 public OnMapEnd()
-{		
+{
 	// Memory leaks: fuck 'em.
-	
+
 	if(g_tCheckTimeLeft!=INVALID_HANDLE)
 	{
 		KillTimer(g_tCheckTimeLeft);
 		g_tCheckTimeLeft = INVALID_HANDLE;
 	}
-	
+
 	for (new i = 0; i < MAXPLAYERS+1; i++)
-	{	
+	{
 		if(g_hRegenTimer[i]!=INVALID_HANDLE)
 		{
 			KillTimer(g_hRegenTimer[i]);
@@ -365,10 +365,10 @@ public OnClientConnected(client)
 		KillTimer(g_hRegenTimer[client]);
 		g_hRegenTimer[client] = INVALID_HANDLE;
 	}
-	
+
 	// Reset the player's damage given/received to 0.
 	ResetPlayerDmgBasedRegen(client, true);
-	
+
 	// Kills the annoying 30 second "waiting for players" at the start of a map.
 	ServerCommand("mp_waitingforplayers_cancel 1");
 }
@@ -467,14 +467,14 @@ public handler_ConVarChange(Handle:convar, const String:oldValue[], const String
 
 /*
  * ------------------------------------------------------------------
- *	  _______                 ___            _ __ 
+ *	  _______                 ___            _ __
  *	 /_  __(_)____ ___  ___  / (_)____ ___  (_) /_
  *	  / / / // __ `__ \/ _ \/ / // __ `__ \/ / __/
- *	 / / / // / / / / /  __/ / // / / / / / / /_  
- *	/_/ /_//_/ /_/ /_/\___/_/_//_/ /_/ /_/_/\__/ 
+ *	 / / / // / / / / /  __/ / // / / / / / / /_
+ *	/_/ /_//_/ /_/ /_/\___/_/_//_/ /_/ /_/_/\__/
  * ------------------------------------------------------------------
  */
- 
+
 /* CheckTime()
  *
  * Check map time left every 15 seconds.
@@ -485,10 +485,10 @@ public Action:CheckTime(Handle:timer)
 	new iTimeLimit;
 	GetMapTimeLeft(iTimeLeft);
 	GetMapTimeLimit(iTimeLimit);
-	
+
 	// If soap_forcetimelimit = 1, mp_timelimit != 0, and the timeleft is < 0, change the map to sm_nextmap in 15 seconds.
-	if (g_bForceTimeLimit && iTimeLeft <= 0 && iTimeLimit > 0) 
-	{	
+	if (g_bForceTimeLimit && iTimeLeft <= 0 && iTimeLimit > 0)
+	{
 		if(GetRealClientCount() > 0) // Prevents a constant map change issue present on a small number of servers.
 		{
 			CreateTimer(15.0, ChangeMap, _, TIMER_FLAG_NO_MAPCHANGE);
@@ -513,12 +513,12 @@ public Action:ChangeMap(Handle:timer)
 		LogError("[SOAP] FATAL: Could not find sm_nextmap cvar. Cannot force a map change!");
 		return;
 	}
-	
+
 	new iTimeLeft;
 	new iTimeLimit;
 	GetMapTimeLeft(iTimeLeft);
 	GetMapTimeLimit(iTimeLimit);
-	
+
 	// Check that soap_forcetimelimit = 1, mp_timelimit != 0, and timeleft < 0 again, because something could have changed in the last 15 seconds.
 	if(g_bForceTimeLimit && iTimeLeft <= 0 &&  iTimeLimit > 0)
 	{
@@ -527,7 +527,7 @@ public Action:ChangeMap(Handle:timer)
 		ForceChangeLevel(newmap, "Enforced Map Timelimit");
 	} else {  // Turns out something did change.
 		LogMessage("[SOAP] Aborting forced map change due to soap_forcetimelimit 1 or timelimit > 0.");
-		
+
 		if(iTimeLeft > 0)
 			CreateTimeCheck();
 	}
@@ -544,18 +544,18 @@ CreateTimeCheck()
 		KillTimer(g_tCheckTimeLeft);
 		g_tCheckTimeLeft = INVALID_HANDLE;
 	}
-		
+
 	g_tCheckTimeLeft = CreateTimer(15.0, CheckTime, _, TIMER_REPEAT);
 }
 
 /*
  * ------------------------------------------------------------------
- *	   _____                            _             
+ *	   _____                            _
  *	  / ___/____  ____ __      ______  (_)____  ____ _
  *	  \__ \/ __ \/ __ `/ | /| / / __ \/ // __ \/ __ `/
- *	 ___/ / /_/ / /_/ /| |/ |/ / / / / // / / / /_/ / 
- *	/____/ .___/\__,_/ |__/|__/_/ /_/_//_/ /_/\__, /  
- *		/_/                                  /____/   
+ *	 ___/ / /_/ / /_/ /| |/ |/ / / / / // / / / /_/ /
+ *	/____/ .___/\__,_/ |__/|__/_/ /_/_//_/ /_/\__, /
+ *		/_/                                  /____/
  * ------------------------------------------------------------------
  */
 
@@ -566,22 +566,22 @@ CreateTimeCheck()
 public Action:RandomSpawn(Handle:timer, any:clientid)
 {
 	new client = GetClientOfUserId(clientid); // UserIDs are passed through timers instead of client indexes because it ensures that no mismatches can happen as UserIDs are unique.
-	
+
 	if(!IsValidClient(client))
 		return Plugin_Handled; // Client wasn't valid, so there's no point in trying to spawn it!
-	
+
 	if(IsPlayerAlive(client)) // Can't teleport a dead player.
 	{
 		new team = GetClientTeam(client), Handle:array, size, Handle:spawns = CreateArray(), count = GetClientCount();
 		decl Float:vectors[6], Float:origin[3], Float:angles[3];
-		
+
 		if(team==2) // Is player on RED?
 		{
 			for(new i=0;i<=count;i++)
 			{
 				// Yep, get the RED spawns for this map.
 				array = GetArrayCell(g_hRedSpawns, i);
-				
+
 				if(GetArraySize(array)!=0)
 					size = PushArrayCell(spawns, array);
 			}
@@ -590,17 +590,17 @@ public Action:RandomSpawn(Handle:timer, any:clientid)
 			{
 				// Get the BLU spawns.
 				array = GetArrayCell(g_hBluSpawns, i);
-				
+
 				if(GetArraySize(array)!=0)
 					size = PushArrayCell(spawns, array);
 			}
 		}
-		
+
 		array = GetArrayCell(spawns, GetRandomInt(0, GetArraySize(spawns)-1));
 		size = GetArraySize(array);
 		GetArrayArray(array, GetRandomInt(0, size-1), vectors); // Put the values from a random spawn in the config into a variable so it can be used.
 		CloseHandle(spawns); // Close the handle so there are no memory leaks.
-		
+
 		// Put the spawn location (origin) and POV (angles) into something a bit easier to keep track of.
 		origin[0] = vectors[0];
 		origin[1] = vectors[1];
@@ -608,14 +608,14 @@ public Action:RandomSpawn(Handle:timer, any:clientid)
 		angles[0] = vectors[3];
 		angles[1] = vectors[4];
 		angles[2] = vectors[5];
-		
+
 		/* Below is how players are prevented from spawning within one another. */
-		
+
 		new Handle:trace = TR_TraceHullFilterEx(origin, angles, Float:{-24.0, -24.0, 0.0}, Float:{24.0, 24.0, 82.0}, MASK_PLAYERSOLID, TraceEntityFilterPlayers);
 		// The above line creates a 'box' at the spawn point to be used. This box is roughly the size of a player.
-		
+
 		if(TR_DidHit(trace) && IsValidClient(TR_GetEntityIndex(trace)))
-		{ 
+		{
 			// The 'box' hit a player!
 			CloseHandle(trace);
 			CreateTimer(0.01, RandomSpawn, clientid, TIMER_FLAG_NO_MAPCHANGE); // Get a new spawn, because this one is occupied.
@@ -625,12 +625,12 @@ public Action:RandomSpawn(Handle:timer, any:clientid)
 			TeleportEntity(client, origin, angles, NULL_VECTOR); // Teleport the player to their spawn point.
 			EmitAmbientSound("items/spawn_item.wav", origin); // Make a sound at the spawn point.
 		}
-		
+
 		CloseHandle(trace); // Stops leaks dead.
 	}
-	
+
 	return Plugin_Continue;
-} 
+}
 
 public bool:TraceEntityFilterPlayers(entity, contentsMask)
 {
@@ -648,24 +648,24 @@ public bool:TraceEntityFilterPlayers(entity, contentsMask)
 public Action:Respawn(Handle:timer, any:clientid)
 {
 	new client = GetClientOfUserId(clientid);
-	
+
 	if(!IsValidClient(client))
 		return;
-	
+
 	TF2_RespawnPlayer(client);
 }
 
 /*
  * ------------------------------------------------------------------
- *		____                      
- *	   / __ \___  ____ ____  ____ 
+ *		____
+ *	   / __ \___  ____ ____  ____
  *	  / /_/ / _ \/ __ `/ _ \/ __ \
  *	 / _, _/  __/ /_/ /  __/ / / /
- *	/_/ |_|\___/\__, /\___/_/ /_/ 
- *			   /____/             
+ *	/_/ |_|\___/\__, /\___/_/ /_/
+ *			   /____/
  * ------------------------------------------------------------------
  */
- 
+
 /* StartRegen()
  *
  * Starts regen-over-time on a player.
@@ -673,16 +673,16 @@ public Action:Respawn(Handle:timer, any:clientid)
 public Action:StartRegen(Handle:timer, any:clientid)
 {
 	new client = GetClientOfUserId(clientid);
-	
+
 	if(g_hRegenTimer[client]!=INVALID_HANDLE)
 	{
 		KillTimer(g_hRegenTimer[client]);
 		g_hRegenTimer[client] = INVALID_HANDLE;
 	}
-	
+
 	if(!IsValidClient(client))
 		return;
-	
+
 	g_bRegen[client] = true;
 	Regen(INVALID_HANDLE, clientid);
 }
@@ -694,16 +694,16 @@ public Action:StartRegen(Handle:timer, any:clientid)
 public Action:Regen(Handle:timer, any:clientid)
 {
 	new client = GetClientOfUserId(clientid);
-	
+
 	if(g_hRegenTimer[client]!=INVALID_HANDLE)
 	{
 		KillTimer(g_hRegenTimer[client]);
 		g_hRegenTimer[client] = INVALID_HANDLE;
 	}
-	
+
 	if(!IsValidClient(client))
 		return;
-	
+
 	if(g_bRegen[client] && IsPlayerAlive(client))
 	{
 		new health = GetClientHealth(client)+g_iRegenHP;
@@ -714,7 +714,7 @@ public Action:Regen(Handle:timer, any:clientid)
 			SetEntProp(client, Prop_Send, "m_iHealth", health, 1);
 			SetEntProp(client, Prop_Data, "m_iHealth", health, 1);
 		}
-		
+
 		g_hRegenTimer[client] = CreateTimer(g_fRegenTick, Regen, clientid); // Call this function again in g_fRegenTick seconds.
 	}
 }
@@ -756,7 +756,7 @@ public Action:Timer_RecentDamagePushback(Handle:timer, any:clientid)
 	for (new i = 1; i <= MaxClients; i++) {
 		if (!IsValidClient(i))
 			continue;
-		
+
 		for (new j = 1; j <= MaxClients; j++) {
 			if (!IsValidClient(j))
 				continue;
@@ -789,15 +789,15 @@ StartStopRecentDamagePushbackTimer()
 
 /*
  * ------------------------------------------------------------------
- *		______                  __      
+ *		______                  __
  *	   / ____/_   _____  ____  / /______
  *	  / __/  | | / / _ \/ __ \/ __/ ___/
- *	 / /___  | |/ /  __/ / / / /_(__  ) 
- *	/_____/  |___/\___/_/ /_/\__/____/  
- * 
+ *	 / /___  | |/ /  __/ / / / /_(__  )
+ *	/_____/  |___/\___/_/ /_/\__/____/
+ *
  * ------------------------------------------------------------------
  */
- 
+
 /* Event_player_death()
  *
  * Called when a player dies.
@@ -810,16 +810,16 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 	new isDeadRinger = GetEventInt(event,"death_flags") & 32;
 	if(!IsValidClient(client) || isDeadRinger)
 		return;
-	
+
 	CreateTimer(g_fSpawn, Respawn, clientid, TIMER_FLAG_NO_MAPCHANGE);
-	
+
 	new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
 	decl String:sWeapon[32];
 	new iWeapon;
-	
+
 	if(IsValidEntity(attacker) && attacker > 0)
 		GetClientWeapon(attacker, sWeapon, sizeof(sWeapon));
-	
+
 	if(IsValidClient(attacker) && client != attacker)
 	{
 		if(g_bShowHP)
@@ -829,7 +829,7 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 			else
 				PrintToChat(client, "[SOAP] %t", "Attacker is dead");
 		}
-		
+
 		// Heals a percentage of the killer's class' max health.
 		if(g_fKillHealRatio > 0.0)
 		{
@@ -838,7 +838,7 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 			else
 				SetEntProp(attacker, Prop_Data, "m_iHealth", GetClientHealth(attacker) + RoundFloat(g_fKillHealRatio * g_iMaxHealth[attacker]));
 		}
-		
+
 		// Heals a flat value, regardless of class.
 		if(g_iKillHealStatic > 0)
 		{
@@ -847,11 +847,11 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 			else
 				SetEntProp(attacker, Prop_Data, "m_iHealth", GetClientHealth(attacker) + g_iKillHealStatic);
 		}
-			
+
 		// Gives full ammo for primary and secondary weapon to the player who got the kill.
 		if(g_bKillAmmo)
 		{
-			// Check the primary weapon, and set its ammo.	
+			// Check the primary weapon, and set its ammo.
 			if(g_iMaxClips1[attacker] > 0 && TF2_GetPlayerClass(attacker) != TFClassType:2)
 				SetEntProp(GetPlayerWeaponSlot(attacker, 0), Prop_Send, "m_iClip1", g_iMaxClips1[attacker]);
 			else if(StrEqual(sWeapon, "tf_weapon_compound_bow") || StrEqual(sWeapon, "tf_weapon_grenadelauncher") || StrEqual(sWeapon, "tf_weapon_revolver") || StrEqual(sWeapon, "tf_weapon_rocketlauncher") || StrEqual(sWeapon, "tf_weapon_rocketlauncher_directhit") || StrEqual(sWeapon, "tf_weapon_scattergun") || StrEqual(sWeapon, "tf_weapon_shotgun_primary") || StrEqual(sWeapon, "tf_weapon_syringegun_medic")) {
@@ -859,8 +859,8 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 				iWeapon = GetEntDataEnt2(attacker, FindSendPropInfo("CTFPlayer", "m_hActiveWeapon"));
 				SetEntProp(iWeapon, Prop_Send, "m_iClip1", GetWeaponAmmo(sWeapon));
 			}
-			
-			// Check the secondary weapon, and set its ammo.	
+
+			// Check the secondary weapon, and set its ammo.
 			if(g_iMaxClips2[attacker] > 0)
 				SetEntProp(GetPlayerWeaponSlot(attacker, 1), Prop_Send, "m_iClip1", g_iMaxClips2[attacker]);
 			else if(StrEqual(sWeapon, "tf_weapon_buff_item") || StrEqual(sWeapon, "tf_weapon_pipebomblauncher") || StrEqual(sWeapon, "tf_weapon_pistol") || StrEqual(sWeapon, "tf_weapon_pistol_scout") || StrEqual(sWeapon, "tf_weapon_shotgun_hwg") || StrEqual(sWeapon, "tf_weapon_shotgun_pyro") || StrEqual(sWeapon, "tf_weapon_shotgun_soldier") || StrEqual(sWeapon, "tf_weapon_smg")) {
@@ -869,12 +869,12 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 				SetEntProp(iWeapon, Prop_Send, "m_iClip1", GetWeaponAmmo(sWeapon));
 			}
 		}
-		
+
 		// Give the killer regen-over-time if so configured.
 		if(g_bKillStartRegen && !g_bRegen[attacker])
 			StartRegen(INVALID_HANDLE, attacker);
 	}
-	
+
 	// Heal the people that damaged the victim (also if the victim died without there being an attacker).
 	if(g_fDamageHealRatio > 0.0)
 	{
@@ -883,31 +883,31 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 		for(new player = 1; player <= MaxClients; player++) {
 			if(!IsValidClient(player))
 				continue;
-			
+
 			new dmg = 0;
 			for(new i = 0; i < RECENT_DAMAGE_SECONDS; i++) {
 				dmg += g_iRecentDamage[client][player][i];
 				g_iRecentDamage[client][player][i] = 0;
 			}
-			
+
 			dmg = RoundFloat(dmg * g_fDamageHealRatio);
-			
+
 			if(dmg > 0 && IsPlayerAlive(player)) {
 				if((GetClientHealth(player) + dmg) > g_iMaxHealth[player])
 					SetEntProp(player, Prop_Data, "m_iHealth", g_iMaxHealth[player]);
 				else
 					SetEntProp(player, Prop_Data, "m_iHealth", GetClientHealth(player) + dmg);
-				
+
 				PrintToChat(player, "[SOAP] %t", attacker == player ? "Kill HP Received" : "Damage HP Received", dmg, clientname);
 			}
 		}
-	}	
-	
+	}
+
 	// Reset the player's recent damage
 	if(g_fDamageHealRatio > 0.0)
 	{
 		ResetPlayerDmgBasedRegen(client);
-	}	
+	}
 }
 
 /* Event_player_hurt()
@@ -920,19 +920,19 @@ public Action:Event_player_hurt(Handle:event, const String:name[], bool:dontBroa
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
 	new damage = GetEventInt(event, "damageamount");
-	
+
 	if(IsValidClient(attacker) && client!=attacker)
 	{
 		g_bRegen[client] = false;
-		
+
 		if(g_hRegenTimer[client]!=INVALID_HANDLE)
 		{
 			KillTimer(g_hRegenTimer[client]);
 			g_hRegenTimer[client] = INVALID_HANDLE;
 		}
-		
+
 		g_hRegenTimer[client] = CreateTimer(g_fRegenDelay, StartRegen, clientid);
-		
+
 		g_iRecentDamage[client][attacker][0] += damage;
 	}
 }
@@ -945,17 +945,17 @@ public Action:Event_player_spawn(Handle:event, const String:name[], bool:dontBro
 {
 	new client = GetClientOfUserId(GetEventInt(event, "userid"));
 	new clientid = GetClientUserId(client);
-	
+
 	if(g_hRegenTimer[client]!=INVALID_HANDLE)
 	{
 		KillTimer(g_hRegenTimer[client]);
 		g_hRegenTimer[client] = INVALID_HANDLE;
 	}
 	g_hRegenTimer[client] = CreateTimer(0.01, StartRegen, clientid);
-	
+
 	if(!IsValidClient(client))
 		return;
-		
+
 	if(g_bSpawnRandom && g_bSpawnMap && (!g_bAFKSupported || !IsPlayerAFK(client))) // Are random spawns on and does this map have spawns?
 		CreateTimer(0.01, RandomSpawn, clientid, TIMER_FLAG_NO_MAPCHANGE);
 	else {
@@ -966,14 +966,14 @@ public Action:Event_player_spawn(Handle:event, const String:name[], bool:dontBro
 			EmitAmbientSound("items/spawn_item.wav", vecOrigin);
 		}
 	}
-	
+
 	// Get the player's max health and store it in a global variable. Doing it this way is handy for things like the Gunslinger and Eyelander, which change max health.
 	g_iMaxHealth[client] = GetClientHealth(client);
-	
+
 	// Crutch used when unlockreplacer.smx is running and it replaces a weapon that isn't equippable or has no ammo.
 	g_iMaxClips1[client] = -1;
 	g_iMaxClips2[client] = -1;
-	
+
 	// Check how much ammo each gun can hold in its clip and store it in a global variable so it can be regenerated to that amount later.
 	if(IsValidEntity(GetPlayerWeaponSlot(client, 0)))
 		g_iMaxClips1[client] = GetEntProp(GetPlayerWeaponSlot(client, 0), Prop_Data, "m_iClip1");
@@ -998,14 +998,14 @@ public Action:Event_player_team(Handle:event, const String:name[], bool:dontBroa
 {
 	new clientid = GetEventInt(event, "userid");
 	new client = GetClientOfUserId(clientid);
-	
+
 	new team = GetEventInt(event, "team");
 	new oldteam = GetEventInt(event, "oldteam");
-	
+
 	if (team != oldteam) {
 		ResetPlayerDmgBasedRegen(client, true);
 	}
-	
+
 	return Plugin_Continue;
 }
 
@@ -1018,7 +1018,7 @@ public OnAfkStateChanged(client, bool:afk) {
 	new TFTeam:team = TFTeam:GetClientTeam(client);
 	if (team != TFTeam_Blue && team != TFTeam_Red)
 		return;
-	
+
 	if (afk) {
 		// Move back to spawn
 		TF2_RespawnPlayer(client);
@@ -1030,15 +1030,15 @@ public OnAfkStateChanged(client, bool:afk) {
 
 /*
  * ------------------------------------------------------------------
- *		__  ____           
+ *		__  ____
  *	   /  |/  (_)__________
  *	  / /|_/ / // ___/ ___/
- *	 / /  / / /(__  ) /__  
- *	/_/  /_/_//____/\___/  
- *						   
+ *	 / /  / / /(__  ) /__
+ *	/_/  /_/_//____/\___/
+ *
  * ------------------------------------------------------------------
  */
- 
+
 /* LockMap()
  *
  * Locks all objectives on the map and gets it ready for DM.
@@ -1064,7 +1064,7 @@ LockMap()
 									"item_ammopack_medium",
 									"item_ammopack_small"
 									};
-								
+
 	for(new i = 0; i < sizeof(saRemove); i++)
 	{
 		new ent = MAXPLAYERS+1;
@@ -1074,8 +1074,8 @@ LockMap()
 				AcceptEntityInput(ent, "Disable");
 		}
 	}
-	
-	
+
+
 	OpenDoors();
 	ResetPlayers();
 }
@@ -1091,7 +1091,7 @@ OpenDoors()
 	if (g_bOpenDoors)
 	{
 		new ent = MAXPLAYERS+1;
-		while((ent = FindEntityByClassname(ent, "func_door"))!=-1) 
+		while((ent = FindEntityByClassname(ent, "func_door"))!=-1)
 		{
 			if (IsValidEdict(ent))
 			{
@@ -1099,9 +1099,9 @@ OpenDoors()
 				AcceptEntityInput(ent, "open", -1);
 			}
 		}
-		
+
 		ent = MAXPLAYERS+1;
-		while((ent = FindEntityByClassname(ent, "prop_dynamic"))!=-1) 
+		while((ent = FindEntityByClassname(ent, "prop_dynamic"))!=-1)
 		{
 			if (IsValidEdict(ent))
 			{
@@ -1122,7 +1122,7 @@ OpenDoors()
  * Can respawn or reset regen-over-time on all players.
  * -------------------------------------------------------------------------- */
 ResetPlayers()
-{	
+{
 	new id;
 	if(FirstLoad == true) {
 		for (new i = 0; i < MaxClients; i++)
@@ -1142,9 +1142,9 @@ ResetPlayers()
 				id = GetClientUserId(i);
 				CreateTimer(0.1, StartRegen, id, TIMER_FLAG_NO_MAPCHANGE);
 			}
-		}	
+		}
 	}
-	
+
 	for (new i = 1; i <= MaxClients; i++)
 		ResetPlayerDmgBasedRegen(i);
 }
@@ -1159,7 +1159,7 @@ ResetPlayerDmgBasedRegen(client, bool:alsoResetTaken = false) {
 			g_iRecentDamage[player][client][i] = 0;
 		}
 	}
-	
+
 	if (alsoResetTaken) {
 		for(new player = 1; player <= MaxClients; player++) {
 			for(new i = 0; i < RECENT_DAMAGE_SECONDS; i++) {
@@ -1201,7 +1201,7 @@ stock FindEntityByClassname2(startEnt, const String:classname[])
 stock GetRealClientCount()
 {
 	new clients = 0;
-	
+
 	for(new i = 1; i <= MaxClients; i++)
 	{
 		if(IsValidClient(i))
@@ -1209,6 +1209,6 @@ stock GetRealClientCount()
 			clients++;
 		}
 	}
-	
+
 	return clients;
 }
