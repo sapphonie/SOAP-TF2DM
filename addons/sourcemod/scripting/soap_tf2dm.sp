@@ -98,7 +98,7 @@ public OnPluginStart()
 	g_bAFKSupported = LibraryExists("afk");
 
 	if (LibraryExists("updater"))
-        Updater_AddPlugin(UPDATE_URL);
+		Updater_AddPlugin(UPDATE_URL);
 
 	LoadTranslations("soap_tf2dm.phrases");
 	// Create convars
