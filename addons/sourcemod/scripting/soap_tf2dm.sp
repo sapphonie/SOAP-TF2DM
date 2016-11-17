@@ -6,12 +6,14 @@
 #include <tf2_stocks>
 #undef REQUIRE_PLUGIN
 #include <afk>
+#include <updater>
 
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME		"SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR		"MikeJS, Lange, & Tondark"
-#define PLUGIN_VERSION		"3.6"
+#define PLUGIN_VERSION		"3.7"
 #define PLUGIN_CONTACT		"http://www.mikejsavage.com/, http://steamcommunity.com/id/langeh/"
+#define UPDATE_URL		"http://lange.github.io/SOAP-TF2DM/updatefile.txt"
 
 // ====[ VARIABLES ]===================================================
 new bool:FirstLoad;
@@ -95,6 +97,9 @@ public OnPluginStart()
 {
 	g_bAFKSupported = LibraryExists("afk");
 	
+	if (LibraryExists("updater"))
+        Updater_AddPlugin(UPDATE_URL);
+	
 	LoadTranslations("soap_tf2dm.phrases");
 	// Create convars
 	CreateConVar("soap", PLUGIN_VERSION, PLUGIN_NAME, FCVAR_REPLICATED);
@@ -163,6 +168,9 @@ public OnLibraryAdded(const String:name[]) {
 	// Set up auto updater
 	if (StrEqual(name, "afk"))
 		g_bAFKSupported = true;
+	
+	if (StrEqual(name, "updater"))
+		Updater_AddPlugin(UPDATE_URL);
 }
 
 public OnLibraryRemoved(const String:name[]) {
