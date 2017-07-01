@@ -591,7 +591,7 @@ public Action:RandomSpawn(Handle:timer, any:clientid) {
 
 		/* Below is how players are prevented from spawning within one another. */
 
-		new Handle:trace = TR_TraceHullFilterEx(origin, angles, Float:{-24.0, -24.0, 0.0}, Float:{24.0, 24.0, 82.0}, MASK_PLAYERSOLID, TraceEntityFilterPlayers);
+		new Handle:trace = TR_TraceHullFilterEx(origin, origin, Float:{-24.0, -24.0, 0.0}, Float:{24.0, 24.0, 82.0}, MASK_PLAYERSOLID, TraceEntityFilterPlayers);
 		// The above line creates a 'box' at the spawn point to be used. This box is roughly the size of a player.
 
 		if (TR_DidHit(trace) && IsValidClient(TR_GetEntityIndex(trace))) {
