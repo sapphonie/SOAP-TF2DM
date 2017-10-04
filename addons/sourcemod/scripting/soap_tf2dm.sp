@@ -8,6 +8,9 @@
 #include <afk>
 #include <updater>
 
+#undef REQUIRE_EXTENSIONS
+#include <cURL>
+
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME		"SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR	"MikeJS, Lange, & Tondark"
@@ -76,6 +79,22 @@ new g_iRecentDamage[MAXPLAYERS+1][MAXPLAYERS+1][RECENT_DAMAGE_SECONDS],
 //AFK
 new g_bAFKSupported;
 
+//cURL
+new g_bcURLSupported;
+
+new CURL_Default_opt[][2] = {
+	{_:CURLOPT_NOSIGNAL,1},
+	{_:CURLOPT_NOPROGRESS,1},
+	{_:CURLOPT_TIMEOUT,300},
+	{_:CURLOPT_CONNECTTIMEOUT,120},
+	{_:CURLOPT_USE_SSL,CURLUSESSL_TRY},
+	{_:CURLOPT_SSL_VERIFYPEER,0},
+	{_:CURLOPT_SSL_VERIFYHOST,0},
+	{_:CURLOPT_VERBOSE,0}
+};
+
+#define CURL_DEFAULT_OPT(%1) curl_easy_setopt_int_array(%1, CURL_Default_opt, sizeof(CURL_Default_opt))
+
 // ====[ PLUGIN ]======================================================
 public Plugin:myinfo = {
 	name		= PLUGIN_NAME,
@@ -87,12 +106,23 @@ public Plugin:myinfo = {
 
 // ====[ FUNCTIONS ]===================================================
 
+public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max) {
+	MarkNativeAsOptional("curl_easy_init");
+	MarkNativeAsOptional("curl_easy_setopt_int_array");
+	MarkNativeAsOptional("curl_OpenFile");
+	MarkNativeAsOptional("curl_easy_setopt_handle");
+	MarkNativeAsOptional("curl_easy_setopt_string");
+	MarkNativeAsOptional("curl_easy_perform_thread");
+	return APLRes_Success;
+}
+
 /* OnPluginStart()
  *
  * When the plugin starts up.
  * -------------------------------------------------------------------------- */
 public OnPluginStart() {
 	g_bAFKSupported = LibraryExists("afk");
+	g_bcURLSupported = GetExtensionFileStatus("curl.ext") == 1 ? true : false;
 
 	if (LibraryExists("updater")) {
 		Updater_AddPlugin(UPDATE_URL);
@@ -169,6 +199,10 @@ public OnLibraryAdded(const String:name[]) {
 		g_bAFKSupported = true;
 	}
 
+	if (StrEqual(name, "cURL")) {
+		g_bcURLSupported = true;
+	}
+
 	if (StrEqual(name, "updater")) {
 		Updater_AddPlugin(UPDATE_URL);
 	}
@@ -177,6 +211,10 @@ public OnLibraryAdded(const String:name[]) {
 public OnLibraryRemoved(const String:name[]) {
 	if (StrEqual(name, "afk")) {
 		g_bAFKSupported = false;
+	}
+
+	if (StrEqual(name, "cURL")) {
+		g_bcURLSupported = false;
 	}
 }
 
@@ -232,64 +270,14 @@ public OnMapStart() {
 	BuildPath(Path_SM, path, sizeof(path), "configs/soap/%s.cfg", map);
 
 	if (FileExists(path)) {
-		g_bSpawnMap = true;
-		FileToKeyValues(g_hKv, path);
-
-		decl String:players[4], Float:vectors[6], Float:origin[3], Float:angles[3];
-		new iplayers;
-
-		do {
-			KvGetSectionName(g_hKv, players, sizeof(players));
-			iplayers = StringToInt(players);
-
-			if (KvJumpToKey(g_hKv, "red")) {
-				KvGotoFirstSubKey(g_hKv);
-				do {
-					KvGetVector(g_hKv, "origin", origin);
-					KvGetVector(g_hKv, "angles", angles);
-
-					vectors[0] = origin[0];
-					vectors[1] = origin[1];
-					vectors[2] = origin[2];
-					vectors[3] = angles[0];
-					vectors[4] = angles[1];
-					vectors[5] = angles[2];
-
-					for (new i = iplayers; i < MAXPLAYERS; i++) {
-						PushArrayArray(GetArrayCell(g_hRedSpawns, i), vectors);
-					}
-				} while (KvGotoNextKey(g_hKv));
-
-				KvGoBack(g_hKv);
-				KvGoBack(g_hKv);
-			} else {
-				SetFailState("Red spawns missing. Map: %s  Players: %i", map, iplayers);
-			}
-
-			if (KvJumpToKey(g_hKv, "blue")) {
-				KvGotoFirstSubKey(g_hKv);
-				do {
-					KvGetVector(g_hKv, "origin", origin);
-					KvGetVector(g_hKv, "angles", angles);
-
-					vectors[0] = origin[0];
-					vectors[1] = origin[1];
-					vectors[2] = origin[2];
-					vectors[3] = angles[0];
-					vectors[4] = angles[1];
-					vectors[5] = angles[2];
-
-					for (new i = iplayers; i < MAXPLAYERS; i++) {
-						PushArrayArray(GetArrayCell(g_hBluSpawns, i), vectors);
-					}
-				} while (KvGotoNextKey(g_hKv));
-			} else {
-				SetFailState("Blue spawns missing. Map: %s  Players: %i", map, iplayers);
-			}
-		} while (KvGotoNextKey(g_hKv));
+		LoadMapConfig(map, path);
 	} else {
-		SetFailState("Map spawns missing. Map: %s", map);
-		LogError("File Not Found: %s", path);
+		if (g_bcURLSupported) {
+			DownloadConfig(map, path);
+		} else {
+			SetFailState("Map spawns missing. Map: %s, no cURL support", map);
+			LogError("File Not Found: %s, no cURL support", path);
+		}
 	}
 	// End spawn system.
 
@@ -298,6 +286,64 @@ public OnMapStart() {
 
 	// Begin the time check that prevents infinite rounds on A/D and KOTH maps.
 	CreateTimeCheck();
+}
+
+public LoadMapConfig(const String:map[], const String:path[]) {
+	g_bSpawnMap = true;
+	FileToKeyValues(g_hKv, path);
+
+	decl String:players[4], Float:vectors[6], Float:origin[3], Float:angles[3];
+	new iplayers;
+
+	do {
+		KvGetSectionName(g_hKv, players, sizeof(players));
+		iplayers = StringToInt(players);
+
+		if (KvJumpToKey(g_hKv, "red")) {
+			KvGotoFirstSubKey(g_hKv);
+			do {
+				KvGetVector(g_hKv, "origin", origin);
+				KvGetVector(g_hKv, "angles", angles);
+
+				vectors[0] = origin[0];
+				vectors[1] = origin[1];
+				vectors[2] = origin[2];
+				vectors[3] = angles[0];
+				vectors[4] = angles[1];
+				vectors[5] = angles[2];
+
+				for (new i = iplayers; i < MAXPLAYERS; i++) {
+					PushArrayArray(GetArrayCell(g_hRedSpawns, i), vectors);
+				}
+			} while (KvGotoNextKey(g_hKv));
+
+			KvGoBack(g_hKv);
+			KvGoBack(g_hKv);
+		} else {
+			SetFailState("Red spawns missing. Map: %s  Players: %i", map, iplayers);
+		}
+
+		if (KvJumpToKey(g_hKv, "blue")) {
+			KvGotoFirstSubKey(g_hKv);
+			do {
+				KvGetVector(g_hKv, "origin", origin);
+				KvGetVector(g_hKv, "angles", angles);
+
+				vectors[0] = origin[0];
+				vectors[1] = origin[1];
+				vectors[2] = origin[2];
+				vectors[3] = angles[0];
+				vectors[4] = angles[1];
+				vectors[5] = angles[2];
+
+				for (new i = iplayers; i < MAXPLAYERS; i++) {
+					PushArrayArray(GetArrayCell(g_hBluSpawns, i), vectors);
+				}
+			} while (KvGotoNextKey(g_hKv));
+		} else {
+			SetFailState("Blue spawns missing. Map: %s  Players: %i", map, iplayers);
+		}
+	} while (KvGotoNextKey(g_hKv));
 }
 
 /* OnMapEnd()
@@ -1172,4 +1218,50 @@ stock GetRealClientCount() {
 	}
 
 	return clients;
+}
+
+DownloadConfig(const String:map[], const String:targetPath[]) {
+	decl String:url[256];
+	Format(url, sizeof(url), "https://raw.githubusercontent.com/Lange/SOAP-TF2DM/master/addons/sourcemod/configs/soap/%s.cfg", map);
+
+	new Handle:curl = curl_easy_init();
+	new Handle:output_file = curl_OpenFile(targetPath, "wb");
+	CURL_DEFAULT_OPT(curl);
+
+	new Handle:hDLPack = CreateDataPack();
+	WritePackCell(hDLPack, _:output_file);
+	WritePackString(hDLPack, map);
+	WritePackString(hDLPack, targetPath);
+
+	curl_easy_setopt_handle(curl, CURLOPT_WRITEDATA, output_file);
+	curl_easy_setopt_string(curl, CURLOPT_URL, url);
+	curl_easy_perform_thread(curl, OnDownloadComplete, hDLPack);
+}
+
+OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
+	decl String:map[128];
+	decl String:targetPath[128];
+
+	ResetPack(hDLPack);
+	CloseHandle(Handle:ReadPackCell(hDLPack)); // output_file
+	ReadPackString(hDLPack, map, sizeof(map));
+	ReadPackString(hDLPack, targetPath, sizeof(targetPath));
+	CloseHandle(hDLPack);
+	CloseHandle(hndl);
+
+	if (code != CURLE_OK) {
+		DeleteFile(targetPath);
+		SetFailState("Map spawns missing. Map: %s, failed to download config", map);
+		LogError("Failed to download config for: %s", map);
+	} else {
+		if (FileSize(targetPath) < 1024) {
+			DeleteFile(targetPath);
+			SetFailState("Map spawns missing. Map: %s, failed to download config", map);
+			LogError("Failed to download config for: %s", map);
+			return;
+		} else {
+			PrintToChatAll("Successfully downloaded config %s", map);
+			LoadMapConfig(map, targetPath);
+		}
+	}
 }
