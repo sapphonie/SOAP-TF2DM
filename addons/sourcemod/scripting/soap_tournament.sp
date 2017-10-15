@@ -200,6 +200,7 @@ public Action:Listener_TournamentPlayerReadystate(client, const String:command[]
 		}
 	}
 	if (GetArraySize(redPlayersReady) == min && GetArraySize(bluePlayersReady) == min)
+	{
 		StopDeathmatching();
 	}
 }
