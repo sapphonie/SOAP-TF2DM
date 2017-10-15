@@ -13,9 +13,9 @@
 
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME		"SOAP TF2 Deathmatch"
-#define PLUGIN_AUTHOR	"MikeJS, Lange, & Tondark"
-#define PLUGIN_VERSION	"3.7"
-#define PLUGIN_CONTACT	"http://www.mikejsavage.com/, http://steamcommunity.com/id/langeh/"
+#define PLUGIN_AUTHOR	"Icewind, MikeJS, Lange, & Tondark"
+#define PLUGIN_VERSION	"3.8"
+#define PLUGIN_CONTACT	"http://steamcommunity.com/id/icewind1991, http://www.mikejsavage.com/, http://steamcommunity.com/id/langeh/"
 #define UPDATE_URL		"http://lange.github.io/SOAP-TF2DM/updatefile.txt"
 
 // ====[ VARIABLES ]===================================================
