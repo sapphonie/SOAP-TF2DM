@@ -100,5 +100,7 @@
 		"Source"	"Path_SM/scripting/soap_tf2dm.sp"
 		"Source"	"Path_SM/scripting/soap_tournament.sp"
 		"Source"	"Path_SM/scripting/include/afk.inc"
+		"Source"	"Path_SM/scripting/include/cURL_header.inc"
+		"Source"	"Path_SM/scripting/include/cURL.inc"
 	}
 }
