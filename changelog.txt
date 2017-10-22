@@ -1,3 +1,13 @@
+Version 3.8
+	- Automatically download new map configuration files
+	- Support some additional maps
+
+Version 3.7
+	- Added Updater support
+	- Map specific configuration files
+	- Add option to remove health packs and ammo packs
+	- Various bug fixes and features
+
 Version 3.4
 	soap_tf2dm:
 	-Added translation support and Russian translation
