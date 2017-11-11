@@ -851,22 +851,28 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 			}
 		}
 
+		new targetHealth = 0;
+
 		// Heals a percentage of the killer's class' max health.
 		if (g_fKillHealRatio > 0.0) {
 			if ((GetClientHealth(attacker) + RoundFloat(g_fKillHealRatio * g_iMaxHealth[attacker])) > g_iMaxHealth[attacker]) {
-				SetEntProp(attacker, Prop_Data, "m_iHealth", g_iMaxHealth[attacker]);
+				targetHealth = g_iMaxHealth[attacker];
 			} else {
-				SetEntProp(attacker, Prop_Data, "m_iHealth", GetClientHealth(attacker) + RoundFloat(g_fKillHealRatio * g_iMaxHealth[attacker]));
+				targetHealth = GetClientHealth(attacker) + RoundFloat(g_fKillHealRatio * g_iMaxHealth[attacker]);
 			}
 		}
 
 		// Heals a flat value, regardless of class.
 		if (g_iKillHealStatic > 0) {
 			if ((GetClientHealth(attacker) + g_iKillHealStatic) > g_iMaxHealth[attacker]) {
-				SetEntProp(attacker, Prop_Data, "m_iHealth", g_iMaxHealth[attacker]);
+				targetHealth = g_iMaxHealth[attacker];
 			} else {
-				SetEntProp(attacker, Prop_Data, "m_iHealth", GetClientHealth(attacker) + g_iKillHealStatic);
+				targetHealth =  GetClientHealth(attacker) + g_iKillHealStatic;
 			}
+		}
+
+		if (targetHealth > GetClientHealth(attacker)) {
+			SetEntProp(attacker, Prop_Data, "m_iHealth", targetHealth);
 		}
 
 		// Gives full ammo for primary and secondary weapon to the player who got the kill.
