@@ -7,7 +7,7 @@
 			"Latest"	"3.8"
 		}
 		
-		"Notes"	"Changes in 3.7:"
+		"Notes"	"Changes in 3.8:"
 		"Notes"	"Support some additional maps"
 		"Notes"	"Automatically download new map configuration files"
 	}
