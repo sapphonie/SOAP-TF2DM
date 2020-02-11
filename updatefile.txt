@@ -25,10 +25,10 @@
 		"Plugin"	"/cfg/sourcemod/soap_notlive.cfg"
 		"Plugin"	"/cfg/sourcemod/soap_tf2dm.cfg"
 		// translations
-		"Plugin"	"/addons/sourcemod/translations/soap_tf2dm.phrases"
-		"Plugin"	"/addons/sourcemod/translations/chi/soap_tf2dm.phrases"
-		"Plugin"	"/addons/sourcemod/translations/de/soap_tf2dm.phrases"
-		"Plugin"	"/addons/sourcemod/translations/ru/soap_tf2dm.phrases"
+		"Plugin"	"/addons/sourcemod/translations/soap_tf2dm.phrases.txt"
+		"Plugin"	"/addons/sourcemod/translations/chi/soap_tf2dm.phrases.txt"
+		"Plugin"	"/addons/sourcemod/translations/de/soap_tf2dm.phrases.txt"
+		"Plugin"	"/addons/sourcemod/translations/ru/soap_tf2dm.phrases.txt"
 		// dm spawn configs
 		"Plugin"	"/addons/sourcemod/configs/soap/arena_lumberyard.cfg"
 		"Plugin"	"/addons/sourcemod/configs/soap/arena_ravine.cfg"
