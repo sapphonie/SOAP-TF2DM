@@ -1,3 +1,21 @@
+Version 4.0
+	soap_tf2dm:
+	- Fixed bugs with entity removal (healthpack/ammopack/triggers etc.)
+	- Fixed several bugs with energy weapons and the widowmaker
+	- Removed support for unlockreplacer as it is broken and outdated
+	- Added soap_teamspawnrandom (defaults to 0) - setting to 1 causes players to spawn in any spawn point in the map config, regardless of team
+	- Added and fixed a ton of maps
+
+	soap_tournament:
+	- Fixed "invalid client index" exception issues
+	- Added plugin forwards to StartDeathmatching and StopDeathmatching for other possible competitive plugins to use, see the include file and `soap_forward_example.sp` for more info
+	- updated soap_live and soap_notlive to not unload certain plugins unneccecarily
+	- Fixed random bugginess with readying and unreadying
+
+	misc:
+	- Added colors to printtochat output
+	- Various tweaks and fixes
+
 Version 3.8
 	- Automatically download new map configuration files
 	- Support some additional maps

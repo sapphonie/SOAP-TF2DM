@@ -4,6 +4,7 @@
 #include <sourcemod>
 #include <sdktools>
 #include <tf2_stocks>
+#include <color_literals>
 #undef REQUIRE_PLUGIN
 #include <afk>
 #include <updater>
@@ -13,10 +14,10 @@
 
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME		"SOAP TF2 Deathmatch"
-#define PLUGIN_AUTHOR	"Icewind, MikeJS, Lange, & Tondark"
-#define PLUGIN_VERSION	"3.8"
-#define PLUGIN_CONTACT	"http://steamcommunity.com/id/icewind1991, http://www.mikejsavage.com/, http://steamcommunity.com/id/langeh/"
-#define UPDATE_URL		"http://lange.github.io/SOAP-TF2DM/updatefile.txt"
+#define PLUGIN_AUTHOR		"Icewind, MikeJS, Lange, Tondark, & stephanie"
+#define PLUGIN_VERSION		"4.0"
+#define PLUGIN_CONTACT		"https://steamcommunity.com/id/icewind1991, https://steamcommunity.com/id/langeh/, https://steph.anie.dev"
+#define UPDATE_URL		"https://lange.github.io/SOAP-TF2DM/updatefile.txt"
 
 // ====[ VARIABLES ]===================================================
 new bool:FirstLoad;
@@ -38,6 +39,8 @@ new Handle:g_hSpawn = INVALID_HANDLE,
 	Float:g_fSpawn,
 	Handle:g_hSpawnRandom = INVALID_HANDLE,
 	bool:g_bSpawnRandom,
+	Handle:g_hTeamSpawnRandom = INVALID_HANDLE,
+	bool:g_bTeamSpawnRandom,
 	bool:g_bSpawnMap,
 	Handle:g_hRedSpawns = INVALID_HANDLE,
 	Handle:g_hBluSpawns = INVALID_HANDLE,
@@ -76,10 +79,10 @@ new Handle:g_hDisableHealthPacks = INVALID_HANDLE, Handle:g_hDisableAmmoPacks = 
 new g_iRecentDamage[MAXPLAYERS+1][MAXPLAYERS+1][RECENT_DAMAGE_SECONDS],
 	Handle:g_hRecentDamageTimer;
 
-//AFK
+// AFK
 new g_bAFKSupported;
 
-//cURL
+// cURL
 new g_bcURLSupported;
 
 new CURL_Default_opt[][2] = {
@@ -91,6 +94,25 @@ new CURL_Default_opt[][2] = {
 	{_:CURLOPT_SSL_VERIFYPEER,0},
 	{_:CURLOPT_SSL_VERIFYHOST,0},
 	{_:CURLOPT_VERBOSE,0}
+};
+
+// Entities to remove
+char g_entIter[][] =  {
+	"team_round_timer",				// DISABLE		- Don't delete this ent, it WILL crash servers otherwise: https://crash.limetech.org/om2df7575vq3
+	"team_control_point_master",			// DISABLE		- this ent causes weird behavior in DM servers if deleted. just disable
+	"team_control_point",				// DISABLE		- No need to remove this, disabling works fine
+	"tf_logic_koth",				// DISABLE		- ^
+	"logic_auto",					// DISABLE		- ^
+	"logic_relay",					// DISABLE		- ^
+	"item_teamflag",				// DISABLE		- ^
+	"trigger_capture_area",				// TELEPORT		- we tele these ents out of the players reach (under the map by 5000 units) to disable them because theres issues with huds sometimes bugging out otherwise if theyre deleted
+	"func_regenerate",				// DELETE		- deleting this ent is the only way to reliably prevent it from working in DM otherwise, and it gets reloaded on match start anyway
+	"item_healthkit_full",				// DELETE		- ^
+	"item_healthkit_medium",			// DELETE		- ^
+	"item_healthkit_small",				// DELETE		- ^
+	"item_ammopack_full",				// DELETE		- ^
+	"item_ammopack_medium",				// DELETE		- ^
+	"item_ammopack_small"				// DELETE		- ^
 };
 
 #define CURL_DEFAULT_OPT(%1) curl_easy_setopt_int_array(%1, CURL_Default_opt, sizeof(CURL_Default_opt))
@@ -121,6 +143,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
  * When the plugin starts up.
  * -------------------------------------------------------------------------- */
 public OnPluginStart() {
+	PrintColoredChatAll("\x0700FF00[\x0700FFBFSOAP\x0700FF00]\x07FFFFFF Soap DM loaded.");
 	g_bAFKSupported = LibraryExists("afk");
 	g_bcURLSupported = GetExtensionFileStatus("curl.ext") == 1 ? true : false;
 
@@ -131,13 +154,15 @@ public OnPluginStart() {
 	LoadTranslations("soap_tf2dm.phrases");
 
 	// Create convars
-	CreateConVar("soap", PLUGIN_VERSION, PLUGIN_NAME, FCVAR_REPLICATED);
+	// make soap version cvar unchageable to work around older autogen'd configs resetting it back to 3.8
+	CreateConVar("soap", PLUGIN_VERSION, PLUGIN_NAME, FCVAR_SPONLY | FCVAR_DONTRECORD | FCVAR_CHEAT);
 	g_hRegenHP = CreateConVar("soap_regenhp", "1", "Health added per regeneration tick. Set to 0 to disable.", FCVAR_NOTIFY);
 	g_hRegenTick = CreateConVar("soap_regentick", "0.1", "Delay between regeration ticks.", FCVAR_NOTIFY);
 	g_hRegenDelay = CreateConVar("soap_regendelay", "5.0", "Seconds after damage before regeneration.", FCVAR_NOTIFY);
 	g_hKillStartRegen = CreateConVar("soap_kill_start_regen", "1", "Start the heal-over-time regen immediately after a kill.", FCVAR_NOTIFY);
 	g_hSpawn = CreateConVar("soap_spawn_delay", "1.5", "Spawn timer.", FCVAR_NOTIFY);
 	g_hSpawnRandom = CreateConVar("soap_spawnrandom", "1", "Enable random spawns.", FCVAR_NOTIFY);
+	g_hTeamSpawnRandom = CreateConVar("soap_teamspawnrandom", "0", "Enable random spawns independent of team", FCVAR_NOTIFY);
 	g_hKillHealRatio = CreateConVar("soap_kill_heal_ratio", "0.5", "Percentage of HP to restore on kills. .5 = 50%. Should not be used with soap_kill_heal_static.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 	g_hDamageHealRatio = CreateConVar("soap_dmg_heal_ratio", "0.0", "Percentage of HP to restore based on amount of damage given. .5 = 50%. Should not be used with soap_kill_heal_static.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 	g_hKillHealStatic = CreateConVar("soap_kill_heal_static", "0", "Amount of HP to restore on kills. Exact value applied the same to all classes. Should not be used with soap_kill_heal_ratio.", FCVAR_NOTIFY);
@@ -156,6 +181,7 @@ public OnPluginStart() {
 	HookConVarChange(g_hKillStartRegen, handler_ConVarChange);
 	HookConVarChange(g_hSpawn, handler_ConVarChange);
 	HookConVarChange(g_hSpawnRandom, handler_ConVarChange);
+	HookConVarChange(g_hTeamSpawnRandom, handler_ConVarChange);
 	HookConVarChange(g_hKillHealRatio, handler_ConVarChange);
 	HookConVarChange(g_hDamageHealRatio, handler_ConVarChange);
 	HookConVarChange(g_hKillHealStatic, handler_ConVarChange);
@@ -185,7 +211,6 @@ public OnPluginStart() {
 
 	// Lock control points and intel on map. Also respawn all players into DM spawns. This instance of LockMap() is needed for mid-round loads of DM. (See: Volt's DM/Pub hybrid server.)
 	LockMap();
-
 	// Reset all player's regens. Used here for mid-round loading compatability.
 	ResetPlayers();
 
@@ -449,6 +474,12 @@ public handler_ConVarChange(Handle:convar, const String:oldValue[], const String
 		} else if (StringToInt(newValue) <= 0) {
 			g_bSpawnRandom = false;
 		}
+	} else if (convar == g_hTeamSpawnRandom) {
+		if (StringToInt(newValue) >= 1) {
+			g_bTeamSpawnRandom = true;
+		} else if (StringToInt(newValue) <= 0) {
+			g_bTeamSpawnRandom = false;
+		}
 	} else if (convar == g_hKillHealRatio) {
 		g_fKillHealRatio = StringToFloat(newValue);
 	} else if (convar == g_hDamageHealRatio) {
@@ -583,7 +614,7 @@ CreateTimeCheck() {
  *	  \__ \/ __ \/ __ `/ | /| / / __ \/ // __ \/ __ `/
  *	 ___/ / /_/ / /_/ /| |/ |/ / / / / // / / / /_/ /
  *	/____/ .___/\__,_/ |__/|__/_/ /_/_//_/ /_/\__, /
- *		/_/                                  /____/
+ *	    /_/                                  /____/
  * ------------------------------------------------------------------
  */
 
@@ -602,6 +633,13 @@ public Action:RandomSpawn(Handle:timer, any:clientid) {
 		new team = GetClientTeam(client), Handle:array, size, Handle:spawns = CreateArray(), count = GetClientCount();
 		decl Float:vectors[6], Float:origin[3], Float:angles[3];
 
+		// if random team spawn is enabled...
+		if (g_bTeamSpawnRandom)
+		{
+			// ...pick a random team!
+			team = GetRandomInt(2, 3);
+		}
+
 		if (team == 2) { // Is player on RED?
 			for (new i = 0; i <= count; i++) {
 				// Yep, get the RED spawns for this map.
@@ -611,7 +649,8 @@ public Action:RandomSpawn(Handle:timer, any:clientid) {
 					size = PushArrayCell(spawns, array);
 				}
 			}
-		} else { // Nope, he's on BLU.
+		}
+		else { // Nope, they're on BLU.
 			for (new i = 0; i <= count; i++) {
 				// Get the BLU spawns.
 				array = GetArrayCell(g_hBluSpawns, i);
@@ -678,12 +717,12 @@ public Action:Respawn(Handle:timer, any:clientid) {
 
 /*
  * ------------------------------------------------------------------
- *		____
+ *	    ____
  *	   / __ \___  ____ ____  ____
  *	  / /_/ / _ \/ __ `/ _ \/ __ \
  *	 / _, _/  __/ /_/ /  __/ / / /
  *	/_/ |_|\___/\__, /\___/_/ /_/
- *			   /____/
+ *	           /____/
  * ------------------------------------------------------------------
  */
 
@@ -741,29 +780,6 @@ public Action:Regen(Handle:timer, any:clientid) {
 	}
 }
 
-/* GetWeaponAmmo()
- *
- * Part of a crutch used when unlockreplacer.smx is loaded.
- * -------------------------------------------------------------------------- */
-GetWeaponAmmo(String:w[32]) {
-	/* This is needed because when unlockreplacer.smx replaces a weapon, the weapon it replaced is still what gets read when certain functions are run.
-	 * Example: The buff banner is replaced with a shotgun. It works fine in-game, but the server will still report an invalid clip size, because the buff banner doesn't use ammo.
-	 * So the name of the weapon that's really equipped is passed to this function, where it is paired with a static value that is it's known clip size. */
-
-	if (StrEqual("tf_weapon_shotgun_soldier", w) || StrEqual("tf_weapon_shotgun_pyro", w) || StrEqual("tf_weapon_shotgun_hwg", w)) {
-		return 6;
-	} else if (StrEqual("tf_weapon_pipebomblauncher", w)) {
-		return 8;
-	} else if (StrEqual("tf_weapon_pistol_scout", w) || StrEqual("tf_weapon_pistol", w)) {
-		return 12;
-	} else if (StrEqual("tf_weapon_smg", w)) {
-		return 25;
-	} else {
-		// Haven't the foggiest idea what weapon they're holding, just give it 1 bullet and be done with it.
-		return 1;
-	}
-}
-
 /* Timer_RecentDamagePushback()
  *
  * Every second push back all recent damage by 1 index.
@@ -810,7 +826,7 @@ StartStopRecentDamagePushbackTimer() {
 
 /*
  * ------------------------------------------------------------------
- *		______                  __
+ *	    ______                  __
  *	   / ____/_   _____  ____  / /______
  *	  / __/  | | / / _ \/ __ \/ __/ ___/
  *	 / /___  | |/ /  __/ / / / /_(__  )
@@ -835,19 +851,36 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 	CreateTimer(g_fSpawn, Respawn, clientid, TIMER_FLAG_NO_MAPCHANGE);
 
 	new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
-	decl String:sWeapon[32];
-	new iWeapon;
 
-	if (IsValidEntity(attacker) && attacker > 0) {
-		GetClientWeapon(attacker, sWeapon, sizeof(sWeapon));
+	new weapon1 = -1;
+	new weapon2 = -1;
+
+	new weaponID1 = -1;
+	new weaponID2 = -1;
+
+
+	if (IsValidClient(attacker) && attacker != 0)
+	{
+		if (IsValidEntity(GetPlayerWeaponSlot(attacker, 0))) {
+			weapon1 = GetPlayerWeaponSlot(attacker, 0);
+			if (weapon1 > MaxClients) {
+				weaponID1 = GetEntProp(weapon1, Prop_Send, "m_iItemDefinitionIndex");
+			}
+		}
+		if (IsValidEntity(GetPlayerWeaponSlot(attacker, 1))) {
+			weapon2 = GetPlayerWeaponSlot(attacker, 1);
+			if (weapon2 > MaxClients) {
+				weaponID2 = GetEntProp(weapon2, Prop_Send, "m_iItemDefinitionIndex");
+			}
+		}
 	}
 
 	if (IsValidClient(attacker) && client != attacker) {
 		if (g_bShowHP) {
 			if (IsPlayerAlive(attacker)) {
-				PrintToChat(client, "[SOAP] %t", "Health Remaining", GetClientHealth(attacker));
+				PrintColoredChat(client, "\x0700FF00[\x0700FFBFSOAP\x0700FF00]\x07FFFFFF %t", "Health Remaining", GetClientHealth(attacker));
 			} else {
-				PrintToChat(client, "[SOAP] %t", "Attacker is dead");
+				PrintColoredChat(client, "\x0700FF00[\x0700FFBFSOAP\x0700FF00]\x07FFFFFF %t", "Attacker is dead");
 			}
 		}
 
@@ -875,24 +908,42 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 			SetEntProp(attacker, Prop_Data, "m_iHealth", targetHealth);
 		}
 
-		// Gives full ammo for primary and secondary weapon to the player who got the kill.
-		if (g_bKillAmmo) {
-			// Check the primary weapon, and set its ammo.
-			if (g_iMaxClips1[attacker] > 0 && TF2_GetPlayerClass(attacker) != TFClassType:2) {
-				SetEntProp(GetPlayerWeaponSlot(attacker, 0), Prop_Send, "m_iClip1", g_iMaxClips1[attacker]);
-			} else if (StrEqual(sWeapon, "tf_weapon_compound_bow") || StrEqual(sWeapon, "tf_weapon_grenadelauncher") || StrEqual(sWeapon, "tf_weapon_revolver") || StrEqual(sWeapon, "tf_weapon_rocketlauncher") || StrEqual(sWeapon, "tf_weapon_rocketlauncher_directhit") || StrEqual(sWeapon, "tf_weapon_scattergun") || StrEqual(sWeapon, "tf_weapon_shotgun_primary") || StrEqual(sWeapon, "tf_weapon_syringegun_medic")) {
-				GetClientWeapon(attacker, sWeapon, sizeof(sWeapon));
-				iWeapon = GetEntDataEnt2(attacker, FindSendPropInfo("CTFPlayer", "m_hActiveWeapon"));
-				SetEntProp(iWeapon, Prop_Send, "m_iClip1", GetWeaponAmmo(sWeapon));
-			}
 
-			// Check the secondary weapon, and set its ammo.
-			if (g_iMaxClips2[attacker] > 0) {
-				SetEntProp(GetPlayerWeaponSlot(attacker, 1), Prop_Send, "m_iClip1", g_iMaxClips2[attacker]);
-			} else if (StrEqual(sWeapon, "tf_weapon_buff_item") || StrEqual(sWeapon, "tf_weapon_pipebomblauncher") || StrEqual(sWeapon, "tf_weapon_pistol") || StrEqual(sWeapon, "tf_weapon_pistol_scout") || StrEqual(sWeapon, "tf_weapon_shotgun_hwg") || StrEqual(sWeapon, "tf_weapon_shotgun_pyro") || StrEqual(sWeapon, "tf_weapon_shotgun_soldier") || StrEqual(sWeapon, "tf_weapon_smg")) {
-				GetClientWeapon(attacker, sWeapon, sizeof(sWeapon));
-				iWeapon = GetEntDataEnt2(attacker, FindSendPropInfo("CTFPlayer", "m_hActiveWeapon"));
-				SetEntProp(iWeapon, Prop_Send, "m_iClip1", GetWeaponAmmo(sWeapon));
+
+		// Gives full ammo for primary and secondary weapon to the player who got the kill.
+		// This is not compatable with unlockreplacer, because as far as i can tell, it doesn't even work anymore.
+		if (g_bKillAmmo) {
+			// if you somehow get it to work, it's still not compatible, sorry!
+			if (FindConVar("sm_unlock_version") == INVALID_HANDLE) {
+				// Check the primary weapon, and set its ammo.
+				// make sure the weapon is actually a real one!
+				if (weapon1 == -1 || weaponID1 == -1) {
+					return;
+				}
+				// Widowmaker can not be reliably resupped, and the point of the weapon is literally infinite ammo for aiming anyway. Skip it!
+				else if (weaponID1 == 527) {
+					return;
+				}
+				// this fixes the cow mangler and pomson
+				else if (weaponID1 == 441 || weaponID1 == 588) {
+					SetEntPropFloat(GetPlayerWeaponSlot(attacker, 0), Prop_Send, "m_flEnergy", 20.0);
+				}
+				else if (g_iMaxClips1[attacker] > 0) {
+					SetEntProp(GetPlayerWeaponSlot(attacker, 0), Prop_Send, "m_iClip1", g_iMaxClips1[attacker]);
+
+				}
+				// Check the secondary weapon, and set its ammo.
+				// make sure the weapon is actually a real one!
+				if (weapon2 == -1 || weaponID2 == -1) {
+					return;
+				}
+				// this fixes the bison
+				else if (weaponID2 == 442) {
+					SetEntPropFloat(GetPlayerWeaponSlot(attacker, 1), Prop_Send, "m_flEnergy", 20.0);
+				}
+				else if (g_iMaxClips2[attacker] > 0) {
+					SetEntProp(GetPlayerWeaponSlot(attacker, 1), Prop_Send, "m_iClip1", g_iMaxClips2[attacker]);
+				}
 			}
 		}
 
@@ -925,8 +976,7 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 				} else {
 					SetEntProp(player, Prop_Data, "m_iHealth", GetClientHealth(player) + dmg);
 				}
-
-				PrintToChat(player, "[SOAP] %t", attacker == player ? "Kill HP Received" : "Damage HP Received", dmg, clientname);
+				PrintColoredChat(player, "\x0700FF00[\x0700FFBFSOAP\x0700FF00]\x07FFFFFF %t", attacker == player ? "Kill HP Received" : "Damage HP Received", dmg, clientname);
 			}
 		}
 	}
@@ -995,10 +1045,6 @@ public Action:Event_player_spawn(Handle:event, const String:name[], bool:dontBro
 	// Get the player's max health and store it in a global variable. Doing it this way is handy for things like the Gunslinger and Eyelander, which change max health.
 	g_iMaxHealth[client] = GetClientHealth(client);
 
-	// Crutch used when unlockreplacer.smx is running and it replaces a weapon that isn't equippable or has no ammo.
-	g_iMaxClips1[client] = -1;
-	g_iMaxClips2[client] = -1;
-
 	// Check how much ammo each gun can hold in its clip and store it in a global variable so it can be regenerated to that amount later.
 	if (IsValidEntity(GetPlayerWeaponSlot(client, 0))) {
 		g_iMaxClips1[client] = GetEntProp(GetPlayerWeaponSlot(client, 0), Prop_Data, "m_iClip1");
@@ -1057,7 +1103,7 @@ public OnAfkStateChanged(client, bool:afk) {
 
 /*
  * ------------------------------------------------------------------
- *		__  ____
+ *	    __  ____
  *	   /  |/  (_)__________
  *	  / /|_/ / // ___/ ___/
  *	 / /  / / /(__  ) /__
@@ -1066,45 +1112,71 @@ public OnAfkStateChanged(client, bool:afk) {
  * ------------------------------------------------------------------
  */
 
-/* LockMap()
+/* LockMap() and other Entity Removal shennanigans
  *
  * Locks all objectives on the map and gets it ready for DM.
+ * OnEntityCreated is required to reliably delete entities that get loaded after LockMap() is called
+ * Note that this DOES NOT fix needing to reload the map after changing the disable cabinet / health pack / ammo pack cvars
  * -------------------------------------------------------------------------- */
 
-LockMap() {
-	// List of entities to remove. This should remove all objectives on a map, but koth_viaduct seems to be partially unaffected by this.
-	new String:saRemove[][] = {
-		"team_round_timer",
-		"func_regenerate",
-		"team_control_point_master",
-		"team_control_point",
-		"trigger_capture_area",
-		"tf_logic_koth",
-		"logic_auto",
-		"logic_relay",
-		"item_teamflag",
-		"item_healthkit_full",
-		"item_healthkit_medium",
-		"item_healthkit_small",
-		"item_ammopack_full",
-		"item_ammopack_medium",
-		"item_ammopack_small"
-	};
 
-	for (new i = 0; i < sizeof(saRemove); i++) {
-		new ent = MAXPLAYERS+1;
-		while ((ent = FindEntityByClassname2(ent, saRemove[i])) != -1 && (!StrEqual(saRemove[i], "func_regenerate", false) || g_bDisableCabinet) && (StrContains(saRemove[i], "item_healthkit", false) == -1 || g_bDisableHealthPacks) && (StrContains(saRemove[i], "item_ammopack", false) == -1 || g_bDisableAmmoPacks)) {
-			if (IsValidEdict(ent)) {
-				AcceptEntityInput(ent, "Disable");
-			}
+LockMap() {
+	for (new i = 0; i < sizeof(g_entIter); i++) {
+		new entity = MAXPLAYERS+1;
+		while ((entity = FindEntityByClassname2(entity, g_entIter[i])) != -1) {
+			RemoveAllEnts(i, entity);
 		}
 	}
-
 	OpenDoors();
 	ResetPlayers();
 }
 
+public void OnEntityCreated(int entity, const char[] className) {
+	for (int i = 0; i < sizeof(g_entIter); i++) {
+		if (StrEqual(className, g_entIter[i])) {
+			RemoveAllEnts(i, entity);
+			break;
+		}
+	}
+}
 
+RemoveAllEnts(int i, int entity)
+{
+	float origin[3];
+	origin[0] = 0.0;
+	origin[1] = 0.0;
+	origin[2] = -5000.0;
+
+	if (IsValidEdict(entity)) {
+		// if ent is a func regen AND cabinets are off, remove it. otherwise skip
+		if (StrContains(g_entIter[i], "func_regenerate", false) != -1) {
+			if (g_bDisableCabinet) {
+				RemoveEntity(entity);
+			}
+		}
+		// if ent is a healthpack AND healthpacks are off, remove it. otherwise skip
+		else if (StrContains(g_entIter[i], "item_healthkit", false) != -1) {
+			if (g_bDisableHealthPacks) {
+				RemoveEntity(entity);
+			}
+		}
+		// if ent is a ammo pack AND ammo kits are off, remove it. otherwise skip
+		else if (StrContains(g_entIter[i], "item_ammopack", false) != -1) {
+			if (g_bDisableAmmoPacks) {
+				RemoveEntity(entity);
+			}
+		}
+		// move trigger zones out of player reach because otherwise the point gets capped in dm servers and it's annoying
+		// we don't remove / disable because both cause issues/bugs otherwise
+		else if (StrContains(g_entIter[i], "trigger_capture", false) != -1) {
+			TeleportEntity(entity, origin, NULL_VECTOR, NULL_VECTOR);
+		}
+		// disable every other found matching ent instead of deleting, deleting certain logic/team timer ents is unneeded and can crash servers
+		else {
+			AcceptEntityInput(entity, "Disable");
+		}
+	}
+}
 
 /* OpenDoors()
  *
@@ -1260,14 +1332,22 @@ OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
 		SetFailState("Map spawns missing. Map: %s, failed to download config", map);
 		LogError("Failed to download config for: %s", map);
 	} else {
-		if (FileSize(targetPath) < 1024) {
+		if (FileSize(targetPath) < 256) {
 			DeleteFile(targetPath);
 			SetFailState("Map spawns missing. Map: %s, failed to download config", map);
 			LogError("Failed to download config for: %s", map);
 			return;
 		} else {
-			PrintToChatAll("Successfully downloaded config %s", map);
+			PrintColoredChatAll("\x0700FF00[\x0700FFBFSOAP\x0700FF00]\x07FFFFFF Successfully downloaded config %s.", map);
 			LoadMapConfig(map, targetPath);
 		}
 	}
+}
+
+/* OnPluginEnd()
+ *
+ * When the plugin shuts down.
+ * -------------------------------------------------------------------------- */
+public OnPluginEnd() {
+	PrintColoredChatAll("\x0700FF00[\x0700FFBFSOAP\x0700FF00]\x07FFFFFF Soap DM unloaded.");
 }
