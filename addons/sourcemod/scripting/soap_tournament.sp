@@ -4,10 +4,10 @@
 #include <color_literals>
 
 // ====[ CONSTANTS ]===================================================
-#define PLUGIN_NAME		"SOAP Tournament"
-#define PLUGIN_AUTHOR		"Lange"
-#define PLUGIN_VERSION		"3.5"
-#define PLUGIN_CONTACT		"https://steamcommunity.com/id/langeh/"
+#define PLUGIN_NAME         "SOAP Tournament"
+#define PLUGIN_AUTHOR       "Lange"
+#define PLUGIN_VERSION      "3.5"
+#define PLUGIN_CONTACT      "https://steamcommunity.com/id/langeh/"
 #define RED 0
 #define BLU 1
 #define TEAM_OFFSET 2
@@ -15,11 +15,11 @@
 // ====[ PLUGIN ]======================================================
 public Plugin:myinfo =
 {
-	name			= PLUGIN_NAME,
-	author			= PLUGIN_AUTHOR,
-	description		= "Automatically loads and unloads plugins when a mp_tournament match goes live or ends.",
-	version			= PLUGIN_VERSION,
-	url			= PLUGIN_CONTACT
+	name                    = PLUGIN_NAME,
+	author                  = PLUGIN_AUTHOR,
+	description             = "Automatically loads and unloads plugins when a mp_tournament match goes live or ends.",
+	version                 = PLUGIN_VERSION,
+	url                     = PLUGIN_CONTACT
 };
 
 // ====[ VARIABLES ]===================================================
@@ -150,7 +150,8 @@ public Event_TournamentStateupdate(Handle:event, const String:name[], bool:dontB
 		if (teamReadyState[RED] && teamReadyState[BLU])
 		{
 			StopDeathmatching();
-		} else
+		}
+		else
 		{ // One or more of the teams isn't ready, StartDeathmatching.
 			StartDeathmatching();
 		}
@@ -208,16 +209,19 @@ public Action:Listener_TournamentPlayerReadystate(client, const String:command[]
 		if (GetClientTeam(client) - TEAM_OFFSET == 0)
 		{
 			PushArrayCell(redPlayersReady, clientid);
-		} else if (GetClientTeam(client) - TEAM_OFFSET == 1)
+		}
+		else if (GetClientTeam(client) - TEAM_OFFSET == 1)
 		{
 			PushArrayCell(bluePlayersReady, clientid);
 		}
-	} else if (StrEqual(arg, "0"))
+	}
+	else if (StrEqual(arg, "0"))
 	{
 		if (GetClientTeam(client) - TEAM_OFFSET == 0)
 		{
 			RemoveFromArray(redPlayersReady, FindValueInArray(redPlayersReady, clientid));
-		} else if (GetClientTeam(client) - TEAM_OFFSET == 1)
+		}
+		else if (GetClientTeam(client) - TEAM_OFFSET == 1)
 		{
 			RemoveFromArray(bluePlayersReady, FindValueInArray(bluePlayersReady, clientid));
 		}

@@ -13,11 +13,11 @@
 #include <cURL>
 
 // ====[ CONSTANTS ]===================================================
-#define PLUGIN_NAME		"SOAP TF2 Deathmatch"
-#define PLUGIN_AUTHOR		"Icewind, MikeJS, Lange, Tondark, & stephanie"
-#define PLUGIN_VERSION		"4.0"
-#define PLUGIN_CONTACT		"https://steamcommunity.com/id/icewind1991, https://steamcommunity.com/id/langeh/, https://steph.anie.dev"
-#define UPDATE_URL		"https://lange.github.io/SOAP-TF2DM/updatefile.txt"
+#define PLUGIN_NAME         "SOAP TF2 Deathmatch"
+#define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark, & stephanie"
+#define PLUGIN_VERSION      "4.0"
+#define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://steamcommunity.com/id/langeh/, https://steph.anie.dev"
+#define UPDATE_URL          "https://lange.github.io/SOAP-TF2DM/updatefile.txt"
 
 // ====[ VARIABLES ]===================================================
 new bool:FirstLoad;
@@ -98,32 +98,32 @@ new CURL_Default_opt[][2] = {
 
 // Entities to remove
 char g_entIter[][] =  {
-	"team_round_timer",				// DISABLE		- Don't delete this ent, it WILL crash servers otherwise: https://crash.limetech.org/om2df7575vq3
-	"team_control_point_master",			// DISABLE		- this ent causes weird behavior in DM servers if deleted. just disable
-	"team_control_point",				// DISABLE		- No need to remove this, disabling works fine
-	"tf_logic_koth",				// DISABLE		- ^
-	"logic_auto",					// DISABLE		- ^
-	"logic_relay",					// DISABLE		- ^
-	"item_teamflag",				// DISABLE		- ^
-	"trigger_capture_area",				// TELEPORT		- we tele these ents out of the players reach (under the map by 5000 units) to disable them because theres issues with huds sometimes bugging out otherwise if theyre deleted
-	"func_regenerate",				// DELETE		- deleting this ent is the only way to reliably prevent it from working in DM otherwise, and it gets reloaded on match start anyway
-	"item_healthkit_full",				// DELETE		- ^
-	"item_healthkit_medium",			// DELETE		- ^
-	"item_healthkit_small",				// DELETE		- ^
-	"item_ammopack_full",				// DELETE		- ^
-	"item_ammopack_medium",				// DELETE		- ^
-	"item_ammopack_small"				// DELETE		- ^
+	"team_round_timer",                 // DISABLE      - Don't delete this ent, it WILL crash servers otherwise: https://crash.limetech.org/om2df7575vq3
+	"team_control_point_master",        // DISABLE      - this ent causes weird behavior in DM servers if deleted. just disable
+	"team_control_point",               // DISABLE      - No need to remove this, disabling works fine
+	"tf_logic_koth",                    // DISABLE      - ^
+	"logic_auto",                       // DISABLE      - ^
+	"logic_relay",                      // DISABLE      - ^
+	"item_teamflag",                    // DISABLE      - ^
+	"trigger_capture_area",             // TELEPORT     - we tele these ents out of the players reach (under the map by 5000 units) to disable them because theres issues with huds sometimes bugging out otherwise if theyre deleted
+	"func_regenerate",                  // DELETE       - deleting this ent is the only way to reliably prevent it from working in DM otherwise, and it gets reloaded on match start anyway
+	"item_healthkit_full",              // DELETE       - ^
+	"item_healthkit_medium",            // DELETE       - ^
+	"item_healthkit_small",             // DELETE       - ^
+	"item_ammopack_full",               // DELETE       - ^
+	"item_ammopack_medium",             // DELETE       - ^
+	"item_ammopack_small"               // DELETE       - ^
 };
 
 #define CURL_DEFAULT_OPT(%1) curl_easy_setopt_int_array(%1, CURL_Default_opt, sizeof(CURL_Default_opt))
 
 // ====[ PLUGIN ]======================================================
 public Plugin:myinfo = {
-	name		= PLUGIN_NAME,
-	author		= PLUGIN_AUTHOR,
-	description	= "Team deathmatch gameplay for TF2.",
-	version		= PLUGIN_VERSION,
-	url			= PLUGIN_CONTACT
+	name           = PLUGIN_NAME,
+	author         = PLUGIN_AUTHOR,
+	description    = "Team deathmatch gameplay for TF2.",
+	version        = PLUGIN_VERSION,
+	url            = PLUGIN_CONTACT
 };
 
 // ====[ FUNCTIONS ]===================================================
