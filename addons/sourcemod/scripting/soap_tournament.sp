@@ -1,11 +1,13 @@
 #pragma semicolon 1
+
 #include <sourcemod>
+#include <color_literals>
 
 // ====[ CONSTANTS ]===================================================
-#define PLUGIN_NAME		"SOAP Tournament"
-#define PLUGIN_AUTHOR		"Lange"
-#define PLUGIN_VERSION		"3.4"
-#define PLUGIN_CONTACT		"http://steamcommunity.com/id/langeh/"
+#define PLUGIN_NAME         "SOAP Tournament"
+#define PLUGIN_AUTHOR       "Lange"
+#define PLUGIN_VERSION      "3.5"
+#define PLUGIN_CONTACT      "https://steamcommunity.com/id/langeh/"
 #define RED 0
 #define BLU 1
 #define TEAM_OFFSET 2
@@ -13,11 +15,11 @@
 // ====[ PLUGIN ]======================================================
 public Plugin:myinfo =
 {
-	name			= PLUGIN_NAME,
-	author			= PLUGIN_AUTHOR,
-	description	= "Automatically loads and unloads plugins when a mp_tournament match goes live or ends.",
-	version		= PLUGIN_VERSION,
-	url				= PLUGIN_CONTACT
+	name                    = PLUGIN_NAME,
+	author                  = PLUGIN_AUTHOR,
+	description             = "Automatically loads and unloads plugins when a mp_tournament match goes live or ends.",
+	version                 = PLUGIN_VERSION,
+	url                     = PLUGIN_CONTACT
 };
 
 // ====[ VARIABLES ]===================================================
@@ -31,8 +33,14 @@ new bool:teamReadyState[2] = { false, false },
 ConVar g_cvReadyModeCountdown;
 ConVar g_cvEnforceReadyModeCountdown;
 
+GlobalForward g_StopDeathMatching;
+GlobalForward g_StartDeathMatching;
 
 // ====[ FUNCTIONS ]===================================================
+
+public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max) {
+	RegPluginLibrary("soap_tournament");
+}
 
 /* OnPluginStart()
  *
@@ -53,9 +61,9 @@ public OnPluginStart()
 
 	// Hook into mp_tournament_restart
 	RegServerCmd("mp_tournament_restart", TournamentRestartHook);
-	
+
 	//HookEvent("teamplay_round_restart_seconds", Event_TeamplayRestartSeconds);
-	HookEvent("tournament_stateupdate", Event_TournamentStateupdate); 
+	HookEvent("tournament_stateupdate", Event_TournamentStateupdate);
 
 	// Hook for events when player changes their team.
 	HookEvent("player_team", Event_PlayerTeam);
@@ -69,9 +77,13 @@ public OnPluginStart()
 	SetConVarInt(g_cvReadyModeCountdown, 5, true, true);
 	HookConVarChange(g_cvEnforceReadyModeCountdown, handler_ConVarChange);
 	HookConVarChange(g_cvReadyModeCountdown, handler_ConVarChange);
-	
+
 	redPlayersReady = CreateArray();
 	bluePlayersReady = CreateArray();
+
+	// add a global forward for other plugins to use
+	g_StopDeathMatching = new GlobalForward("SOAP_StopDeathMatching", ET_Event);
+	g_StartDeathMatching = new GlobalForward("SOAP_StartDeathMatching", ET_Event);
 
 	StartDeathmatching();
 }
@@ -96,10 +108,12 @@ StopDeathmatching()
 	if(g_dm == true)
 	{
 		ServerCommand("exec sourcemod/soap_live.cfg");
-		PrintToChatAll("[SOAP] %t", "Plugins unloaded");
+		PrintColoredChatAll("\x0700FF00[\x0700FFBFSOAP\x0700FF00]\x07FFFFFF \x073EFF3E%t", "Plugins unloaded");
 		ClearArray(redPlayersReady);
 		ClearArray(bluePlayersReady);
 		g_dm = false;
+		Call_StartForward(g_StopDeathMatching);
+		Call_Finish();
 	}
 }
 
@@ -112,10 +126,12 @@ StartDeathmatching()
 	if(g_dm == false)
 	{
 		ServerCommand("exec sourcemod/soap_notlive.cfg");
-		PrintToChatAll("[SOAP] %t", "Plugins reloaded");
+		PrintColoredChatAll("\x0700FF00[\x0700FFBFSOAP\x0700FF00]\x07FFFFFF \x07FF0000%t", "Plugins reloaded");
 		ClearArray(redPlayersReady);
 		ClearArray(bluePlayersReady);
 		g_dm = true;
+		Call_StartForward(g_StartDeathMatching);
+		Call_Finish();
 	}
 }
 
@@ -123,7 +139,6 @@ StartDeathmatching()
 
 public Event_TournamentStateupdate(Handle:event, const String:name[], bool:dontBroadcast)
 {
-	
 	new team = GetClientTeam(GetEventInt(event, "userid")) - TEAM_OFFSET;
 	new bool:nameChange = GetEventBool(event, "namechange");
 	new bool:readyState = GetEventBool(event, "readystate");
@@ -131,12 +146,13 @@ public Event_TournamentStateupdate(Handle:event, const String:name[], bool:dontB
 	if (!nameChange)
 	{
 		teamReadyState[team] = readyState;
-
 		// If both teams are ready, StopDeathmatching.
 		if (teamReadyState[RED] && teamReadyState[BLU])
 		{
 			StopDeathmatching();
-		} else { // One or more of the teams isn't ready, StartDeathmatching.
+		}
+		else
+		{ // One or more of the teams isn't ready, StartDeathmatching.
 			StartDeathmatching();
 		}
 	}
@@ -145,7 +161,14 @@ public Event_TournamentStateupdate(Handle:event, const String:name[], bool:dontB
 public Event_PlayerTeam(Handle:event, const String:name[], bool:dontBroadcast)
 {
 	new clientid = GetEventInt(event, "userid");
-	RemoveFromArray(redPlayersReady, FindValueInArray(redPlayersReady, clientid));
+	if (FindValueInArray(redPlayersReady, clientid) != -1)
+	{
+		RemoveFromArray(redPlayersReady, FindValueInArray(redPlayersReady, clientid));
+	}
+	else if (FindValueInArray(bluePlayersReady, clientid) != -1)
+	{
+		RemoveFromArray(bluePlayersReady, FindValueInArray(bluePlayersReady, clientid));
+	}
 }
 
 public GameOverEvent(Handle:event, const String:name[], bool:dontBroadcast)
@@ -179,22 +202,26 @@ public Action:Listener_TournamentPlayerReadystate(client, const String:command[]
 {
 	decl String:arg[4];
 	new min = GetConVarInt(g_readymode_min), clientid = GetClientUserId(client);
+
 	GetCmdArg(1, arg, sizeof(arg));
 	if (StrEqual(arg, "1"))
 	{
 		if (GetClientTeam(client) - TEAM_OFFSET == 0)
 		{
 			PushArrayCell(redPlayersReady, clientid);
-		} else if (GetClientTeam(client) - TEAM_OFFSET == 1)
+		}
+		else if (GetClientTeam(client) - TEAM_OFFSET == 1)
 		{
 			PushArrayCell(bluePlayersReady, clientid);
 		}
-	} else if (StrEqual(arg, "0"))
+	}
+	else if (StrEqual(arg, "0"))
 	{
 		if (GetClientTeam(client) - TEAM_OFFSET == 0)
 		{
 			RemoveFromArray(redPlayersReady, FindValueInArray(redPlayersReady, clientid));
-		} else if (GetClientTeam(client) - TEAM_OFFSET == 1)
+		}
+		else if (GetClientTeam(client) - TEAM_OFFSET == 1)
 		{
 			RemoveFromArray(bluePlayersReady, FindValueInArray(bluePlayersReady, clientid));
 		}
