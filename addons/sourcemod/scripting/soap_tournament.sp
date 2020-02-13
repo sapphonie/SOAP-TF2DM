@@ -6,7 +6,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP Tournament"
 #define PLUGIN_AUTHOR       "Lange"
-#define PLUGIN_VERSION      "3.5"
+#define PLUGIN_VERSION      "3.6"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/langeh/"
 #define RED 0
 #define BLU 1
@@ -28,13 +28,14 @@ new bool:teamReadyState[2] = { false, false },
 	bool:g_dm = false,
 	Handle:redPlayersReady,
 	Handle:bluePlayersReady,
-	Handle:g_readymode_min;
+	Handle:g_readymode_min,
+	// global forward handles
+	Handle:g_StopDeathMatching,
+	Handle:g_StartDeathMatching;
 
 ConVar g_cvReadyModeCountdown;
 ConVar g_cvEnforceReadyModeCountdown;
 
-GlobalForward g_StopDeathMatching;
-GlobalForward g_StartDeathMatching;
 
 // ====[ FUNCTIONS ]===================================================
 
@@ -81,9 +82,10 @@ public OnPluginStart()
 	redPlayersReady = CreateArray();
 	bluePlayersReady = CreateArray();
 
+
 	// add a global forward for other plugins to use
-	g_StopDeathMatching = new GlobalForward("SOAP_StopDeathMatching", ET_Event);
-	g_StartDeathMatching = new GlobalForward("SOAP_StartDeathMatching", ET_Event);
+	g_StopDeathMatching = CreateGlobalForward("SOAP_StopDeathMatching", ET_Event);
+	g_StartDeathMatching = CreateGlobalForward("SOAP_StartDeathMatching", ET_Event);
 
 	StartDeathmatching();
 }
@@ -164,10 +166,14 @@ public Event_PlayerTeam(Handle:event, const String:name[], bool:dontBroadcast)
 	if (FindValueInArray(redPlayersReady, clientid) != -1)
 	{
 		RemoveFromArray(redPlayersReady, FindValueInArray(redPlayersReady, clientid));
+		// teamReadyState[RED] = false;
+		// ^ not pushing until I do further testing
 	}
 	else if (FindValueInArray(bluePlayersReady, clientid) != -1)
 	{
 		RemoveFromArray(bluePlayersReady, FindValueInArray(bluePlayersReady, clientid));
+		// teamReadyState[BLU] = false;
+		// ^ not pushing until I do further testing
 	}
 }
 
