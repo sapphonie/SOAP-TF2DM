@@ -1,3 +1,14 @@
+Version 4.0.3
+	soap_tf2dm:
+	- Bumped vers # to trigger autoupdate
+
+	soap_tournament:
+	- Moved plugin forwards to beginning of Start/StopDeathmatching calls
+	- Changed ready detection to be significantly more accurate and way less buggy
+
+	misc:
+	- Fixed russian translations. Thanks Blueberryy!
+
 Version 4.0
 	soap_tf2dm:
 	- Fixed bugs with entity removal (healthpack/ammopack/triggers etc.)

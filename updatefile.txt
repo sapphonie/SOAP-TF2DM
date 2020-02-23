@@ -4,15 +4,12 @@
 	{
 		"Version"
 		{
-			"Latest"	"4.0.2"
+			"Latest"	"4.0.3"
 		}
-		"Notes"		"Changes in 4.0:"
-		"Notes"		"Added new maps, fixed old maps, added colors, added soap_teamspawnrandom cvar"
-		"Notes"		"Fixed bugs with energy weapons and the widowmaker"
-		"Notes"		"Fixed bugs with removing health/ammo packs and trigger zones"
-		"Notes"		"Fixed issue with soap_tournament involving invalid array index exceptions"
-		"Notes"		"Check out the github for more info!"
-		"Notes"		"Vers. 4.0.2 fixes issues with soap_tournament on sourcemod 1.9 and lower"
+		"Notes"		"Changes in 4.0.3:"
+		"Notes"		"- Fixed issue with soap_tournament"
+		"Notes"		"- Fixed issue with entity removal with soap_tf2dm"
+		"Notes"		"- Fixed issue with russian translation thanks to Blueberryy (pushed to autoupdater)"
 	}
 
 	"Files"
@@ -20,10 +17,10 @@
 		// soap plugins
 		"Plugin"	"/addons/sourcemod/plugins/soap_tf2dm.smx"
 		"Plugin"	"/addons/sourcemod/plugins/soap_tournament.smx"
-		// soap configs
-		"Plugin"	"/cfg/sourcemod/soap_live.cfg"
-		"Plugin"	"/cfg/sourcemod/soap_notlive.cfg"
-		"Plugin"	"/cfg/sourcemod/soap_tf2dm.cfg"
+		// soap configs -> only update if changed
+		//"Plugin"	"/cfg/sourcemod/soap_live.cfg"
+		//"Plugin"	"/cfg/sourcemod/soap_notlive.cfg"
+		//"Plugin"	"/cfg/sourcemod/soap_tf2dm.cfg"
 		// translations
 		"Plugin"	"/addons/sourcemod/translations/soap_tf2dm.phrases.txt"
 		"Plugin"	"/addons/sourcemod/translations/chi/soap_tf2dm.phrases.txt"
