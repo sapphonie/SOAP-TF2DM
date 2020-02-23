@@ -878,9 +878,9 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 	if (IsValidClient(attacker) && client != attacker) {
 		if (g_bShowHP) {
 			if (IsPlayerAlive(attacker)) {
-				PrintColoredChat(client, COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... "%t", "Health Remaining", GetClientHealth(attacker));
+				PrintColoredChat(client, COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " %t", "Health Remaining", GetClientHealth(attacker));
 			} else {
-				PrintColoredChat(client, COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... "%t", "Attacker is dead");
+				PrintColoredChat(client, COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " %t", "Attacker is dead");
 			}
 		}
 
@@ -976,7 +976,7 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 				} else {
 					SetEntProp(player, Prop_Data, "m_iHealth", GetClientHealth(player) + dmg);
 				}
-				PrintColoredChat(player, COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... "%t", attacker == player ? "Kill HP Received" : "Damage HP Received", dmg, clientname);
+				PrintColoredChat(player, COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " %t", attacker == player ? "Kill HP Received" : "Damage HP Received", dmg, clientname);
 			}
 		}
 	}
