@@ -3,27 +3,28 @@
 	"Health Remaining"
 	{
 		"#format"		"{1:i}"
-		"ru"			"У противника осталось {1} оз."
+		"en"			"Your attacker had {1} health remaining."
 	}
 	"Attacker is dead"
 	{
-		"ru"			"Ваш убийца мёртв."
+		"en"			"Your attacker is dead."
 	}
 	"Plugins unloaded"
 	{
-		"ru"			"Плагины отключены."
+		"en"			"Plugins unloaded."
 	}
 	"Plugins reloaded"
 	{
-		"ru"			"Плагины загружены."
+		"en"			"Plugins reloaded."
+	}
 	"Kill HP Received"
 	{
 		"#format"		"{1:i},{2:s}"
-		"ru"			"Вы получили {1} оз за убийство {2}"
+		"en"			"You got {1} hp for killing {2}"
 	}
 	"Damage HP Received"
 	{
 		"#format"		"{1:i},{2:s}"
-		"ru"			"Вы получили {1} оз за нанесение урона {2}"
+		"en"			"You got {1} hp for damaging {2}"
 	}
 }
