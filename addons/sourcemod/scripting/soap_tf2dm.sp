@@ -15,7 +15,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark, & stephanie"
-#define PLUGIN_VERSION      "4.0.2"
+#define PLUGIN_VERSION      "4.0.3"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://steamcommunity.com/id/langeh/, https://steph.anie.dev"
 #define UPDATE_URL          "https://raw.githubusercontent.com/Lange/SOAP-TF2DM/master/updatefile.txt"
 
@@ -143,7 +143,7 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
  * When the plugin starts up.
  * -------------------------------------------------------------------------- */
 public OnPluginStart() {
-	PrintColoredChatAll("\x0700FF00[\x0700FFBFSOAP\x0700FF00]\x07FFFFFF Soap DM loaded.");
+	PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " Soap DM loaded.");
 	g_bAFKSupported = LibraryExists("afk");
 	g_bcURLSupported = GetExtensionFileStatus("curl.ext") == 1 ? true : false;
 
@@ -878,9 +878,9 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 	if (IsValidClient(attacker) && client != attacker) {
 		if (g_bShowHP) {
 			if (IsPlayerAlive(attacker)) {
-				PrintColoredChat(client, "\x0700FF00[\x0700FFBFSOAP\x0700FF00]\x07FFFFFF %t", "Health Remaining", GetClientHealth(attacker));
+				PrintColoredChat(client, COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " %t", "Health Remaining", GetClientHealth(attacker));
 			} else {
-				PrintColoredChat(client, "\x0700FF00[\x0700FFBFSOAP\x0700FF00]\x07FFFFFF %t", "Attacker is dead");
+				PrintColoredChat(client, COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " %t", "Attacker is dead");
 			}
 		}
 
@@ -976,7 +976,7 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 				} else {
 					SetEntProp(player, Prop_Data, "m_iHealth", GetClientHealth(player) + dmg);
 				}
-				PrintColoredChat(player, "\x0700FF00[\x0700FFBFSOAP\x0700FF00]\x07FFFFFF %t", attacker == player ? "Kill HP Received" : "Damage HP Received", dmg, clientname);
+				PrintColoredChat(player, COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " %t", attacker == player ? "Kill HP Received" : "Damage HP Received", dmg, clientname);
 			}
 		}
 	}
@@ -1338,7 +1338,7 @@ OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
 			LogError("Failed to download config for: %s", map);
 			return;
 		} else {
-			PrintColoredChatAll("\x0700FF00[\x0700FFBFSOAP\x0700FF00]\x07FFFFFF Successfully downloaded config %s.", map);
+			PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " Successfully downloaded config %s.", map);
 			LoadMapConfig(map, targetPath);
 		}
 	}
@@ -1349,5 +1349,5 @@ OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
  * When the plugin shuts down.
  * -------------------------------------------------------------------------- */
 public OnPluginEnd() {
-	PrintColoredChatAll("\x0700FF00[\x0700FFBFSOAP\x0700FF00]\x07FFFFFF Soap DM unloaded.");
+	PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " Soap DM unloaded.");
 }
