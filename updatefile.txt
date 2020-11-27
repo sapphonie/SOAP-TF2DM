@@ -4,11 +4,10 @@
 	{
 		"Version"
 		{
-			"Latest"	"4.0.3"
+			"Latest"	"4.1.0"
 		}
-		"Notes"		"Changes in 4.0.3:"
-		"Notes"		"- Fixed issue with soap_tournament"
-		"Notes"		"- Fixed issue with russian translation thanks to Blueberryy (pushed to autoupdater)"
+		"Notes"		"Changes in 4.1.0:"
+		"Notes"		"- Update to new repo"
 	}
 
 	"Files"
