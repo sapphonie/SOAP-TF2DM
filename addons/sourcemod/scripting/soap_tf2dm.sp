@@ -1147,7 +1147,7 @@ RemoveAllEnts(int i, int entity)
 	origin[1] = 0.0;
 	origin[2] = -5000.0;
 
-	if (IsValidEdict(entity)) {
+	if (IsValidEntity(entity)) {
 		// if ent is a func regen AND cabinets are off, remove it. otherwise skip
 		if (StrContains(g_entIter[i], "func_regenerate", false) != -1) {
 			if (g_bDisableCabinet) {
@@ -1186,7 +1186,7 @@ OpenDoors() {
 	if (g_bOpenDoors) {
 		new ent = MAXPLAYERS+1;
 		while ((ent = FindEntityByClassname(ent, "func_door"))!=-1) {
-			if (IsValidEdict(ent)) {
+			if (IsValidEntity(ent)) {
 				AcceptEntityInput(ent, "unlock", -1);
 				AcceptEntityInput(ent, "open", -1);
 			}
@@ -1194,7 +1194,7 @@ OpenDoors() {
 
 		ent = MAXPLAYERS+1;
 		while ((ent = FindEntityByClassname(ent, "prop_dynamic"))!=-1) {
-			if (IsValidEdict(ent)) {
+			if (IsValidEntity(ent)) {
 				new String:tName[64];
 				GetEntPropString(ent, Prop_Data, "m_iName", tName, sizeof(tName));
 				if ((StrContains(tName,"door",false)!=-1) || (StrContains(tName,"gate",false)!=-1)) {
