@@ -1,4 +1,4 @@
-# SOAP
+# SOAP DM
 
 > Team DeathMatch gameplay plugins for Team Fortress 2
 
