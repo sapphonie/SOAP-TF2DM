@@ -14,8 +14,8 @@
 
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
-#define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark, - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.1.0"
+#define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
+#define PLUGIN_VERSION      "4.1.1"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://steamcommunity.com/id/langeh/, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -102,11 +102,14 @@ char g_entIter[][] =  {
 	"team_control_point_master",        // DISABLE      - this ent causes weird behavior in DM servers if deleted. just disable
 	"team_control_point",               // DISABLE      - No need to remove this, disabling works fine
 	"tf_logic_koth",                    // DISABLE      - ^
+	"tf_logic_arena",                   // DELETE       - need to delete these, otherwise fight / spectate bullshit shows up on arena maps
 	"logic_auto",                       // DISABLE      - ^
 	"logic_relay",                      // DISABLE      - ^
 	"item_teamflag",                    // DISABLE      - ^
 	"trigger_capture_area",             // TELEPORT     - we tele these ents out of the players reach (under the map by 5000 units) to disable them because theres issues with huds sometimes bugging out otherwise if theyre deleted
 	"func_regenerate",                  // DELETE       - deleting this ent is the only way to reliably prevent it from working in DM otherwise, and it gets reloaded on match start anyway
+	"func_respawnroom",                 // DELETE       - ^
+	"func_respawnroomvisualizer",       // DELETE       - ^
 	"item_healthkit_full",              // DELETE       - ^
 	"item_healthkit_medium",            // DELETE       - ^
 	"item_healthkit_small",             // DELETE       - ^
@@ -288,10 +291,10 @@ public OnMapStart() {
 
 	g_hKv = CreateKeyValues("Spawns");
 
-	decl String:map[64];
+	char map[64];
 	GetCurrentMap(map, sizeof(map));
 
-	decl String:path[256];
+	char path[256];
 	BuildPath(Path_SM, path, sizeof(path), "configs/soap/%s.cfg", map);
 
 	if (FileExists(path)) {
@@ -317,7 +320,10 @@ public LoadMapConfig(const String:map[], const String:path[]) {
 	g_bSpawnMap = true;
 	FileToKeyValues(g_hKv, path);
 
-	decl String:players[4], Float:vectors[6], Float:origin[3], Float:angles[3];
+	char players[4];
+	float vectors[6];
+	float origin[3];
+	float angles[3];
 	new iplayers;
 
 	do {
@@ -631,7 +637,9 @@ public Action:RandomSpawn(Handle:timer, any:clientid) {
 
 	if (IsPlayerAlive(client)) { // Can't teleport a dead player.
 		new team = GetClientTeam(client), Handle:array, size, Handle:spawns = CreateArray(), count = GetClientCount();
-		decl Float:vectors[6], Float:origin[3], Float:angles[3];
+		float vectors[6];
+		float origin[3];
+		float angles[3];
 
 		// if random team spawn is enabled...
 		if (g_bTeamSpawnRandom)
@@ -686,6 +694,7 @@ public Action:RandomSpawn(Handle:timer, any:clientid) {
 			return Plugin_Handled;
 		} else {
 			// All clear.
+			TF2_RemoveCondition(client, TFCond_UberchargedHidden);
 			TeleportEntity(client, origin, angles, NULL_VECTOR); // Teleport the player to their spawn point.
 			EmitAmbientSound("items/spawn_item.wav", origin); // Make a sound at the spawn point.
 		}
@@ -908,8 +917,6 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 			SetEntProp(attacker, Prop_Data, "m_iHealth", targetHealth);
 		}
 
-
-
 		// Gives full ammo for primary and secondary weapon to the player who got the kill.
 		// This is not compatable with unlockreplacer, because as far as i can tell, it doesn't even work anymore.
 		if (g_bKillAmmo) {
@@ -955,7 +962,7 @@ public Action:Event_player_death(Handle:event, const String:name[], bool:dontBro
 
 	// Heal the people that damaged the victim (also if the victim died without there being an attacker).
 	if (g_fDamageHealRatio > 0.0) {
-		decl String:clientname[32];
+		char clientname[32];
 		GetClientName(client, clientname, sizeof(clientname));
 		for (new player = 1; player <= MaxClients; player++) {
 			if (!IsValidClient(player)) {
@@ -1029,6 +1036,8 @@ public Action:Event_player_spawn(Handle:event, const String:name[], bool:dontBro
 		return;
 	}
 
+	TF2_AddCondition(client, TFCond_UberchargedHidden, TFCondDuration_Infinite, 0);
+
 	// Are random spawns on and does this map have spawns?
 	if (g_bSpawnRandom && g_bSpawnMap && (!g_bAFKSupported || !IsPlayerAFK(client))) {
 		CreateTimer(0.01, RandomSpawn, clientid, TIMER_FLAG_NO_MAPCHANGE);
@@ -1036,7 +1045,7 @@ public Action:Event_player_spawn(Handle:event, const String:name[], bool:dontBro
 		// Play a sound anyway, because sounds are cool.
 		// Don't play a sound if the player is AFK.
 		if (!g_bAFKSupported || !IsPlayerAFK(client)) {
-			decl Float:vecOrigin[3];
+			float vecOrigin[3];
 			GetClientEyePosition(client, vecOrigin);
 			EmitAmbientSound("items/spawn_item.wav", vecOrigin);
 		}
@@ -1142,68 +1151,142 @@ public void OnEntityCreated(int entity, const char[] className) {
 
 RemoveAllEnts(int i, int entity)
 {
-	float origin[3];
-	origin[0] = 0.0;
-	origin[1] = 0.0;
-	origin[2] = -5000.0;
-
 	if (IsValidEntity(entity)) {
+		// remove arena logic (disabling doesn't properly disable the fight / spectate bullshit)
+		if (StrContains(g_entIter[i], "tf_logic_arena", false) != -1)
+		{
+			RemoveEntity(entity);
+		}
 		// if ent is a func regen AND cabinets are off, remove it. otherwise skip
-		if (StrContains(g_entIter[i], "func_regenerate", false) != -1) {
-			if (g_bDisableCabinet) {
+		else if (StrContains(g_entIter[i], "func_regenerate", false) != -1) {
+			if (g_bDisableCabinet)
+			{
+				RemoveEntity(entity);
+			}
+		}
+		else if (StrContains(g_entIter[i], "func_respawnroom", false) != -1) {
+			if (g_bDisableCabinet)
+			{
 				RemoveEntity(entity);
 			}
 		}
 		// if ent is a healthpack AND healthpacks are off, remove it. otherwise skip
 		else if (StrContains(g_entIter[i], "item_healthkit", false) != -1) {
-			if (g_bDisableHealthPacks) {
+			if (g_bDisableHealthPacks)
+			{
 				RemoveEntity(entity);
 			}
 		}
 		// if ent is a ammo pack AND ammo kits are off, remove it. otherwise skip
 		else if (StrContains(g_entIter[i], "item_ammopack", false) != -1) {
-			if (g_bDisableAmmoPacks) {
+			if (g_bDisableAmmoPacks)
+			{
 				RemoveEntity(entity);
 			}
 		}
 		// move trigger zones out of player reach because otherwise the point gets capped in dm servers and it's annoying
 		// we don't remove / disable because both cause issues/bugs otherwise
-		else if (StrContains(g_entIter[i], "trigger_capture", false) != -1) {
-			TeleportEntity(entity, origin, NULL_VECTOR, NULL_VECTOR);
+		else if (StrContains(g_entIter[i], "trigger_capture", false) != -1)
+		{
+            TeleportEntity(entity, view_as<float>({0.0, 0.0, -5000.0}), NULL_VECTOR, NULL_VECTOR);
 		}
 		// disable every other found matching ent instead of deleting, deleting certain logic/team timer ents is unneeded and can crash servers
-		else {
+		else
+		{
 			AcceptEntityInput(entity, "Disable");
 		}
 	}
 }
 
-/* OpenDoors()
+/* OpenDoors() - rewritten by nanochip and stephanie
  *
  * Initially forces all doors open and keeps them unlocked even when they close.
  * -------------------------------------------------------------------------- */
-OpenDoors() {
-	if (g_bOpenDoors) {
-		new ent = MAXPLAYERS+1;
-		while ((ent = FindEntityByClassname(ent, "func_door"))!=-1) {
-			if (IsValidEntity(ent)) {
-				AcceptEntityInput(ent, "unlock", -1);
-				AcceptEntityInput(ent, "open", -1);
-			}
-		}
 
-		ent = MAXPLAYERS+1;
-		while ((ent = FindEntityByClassname(ent, "prop_dynamic"))!=-1) {
-			if (IsValidEntity(ent)) {
-				new String:tName[64];
-				GetEntPropString(ent, Prop_Data, "m_iName", tName, sizeof(tName));
-				if ((StrContains(tName,"door",false)!=-1) || (StrContains(tName,"gate",false)!=-1)) {
-					AcceptEntityInput(ent, "unlock", -1);
-					AcceptEntityInput(ent, "open", -1);
-				}
-			}
-		}
-	}
+void OpenDoors()
+{
+    if (g_bOpenDoors)
+    {
+        int ent = -1;
+        // search for all func doors
+        while ((ent = FindEntityByClassname(ent, "func_door")) != -1)
+        {
+            if (IsValidEntity(ent))
+            {
+                AcceptEntityInput(ent, "unlock", -1);
+                AcceptEntityInput(ent, "open", -1);
+                //RemoveEntity(ent);
+                FixNearbyDoorRelatedThings(ent);
+            }
+        }
+        // reset ent
+        ent = -1;
+        // search for all other possible doors
+        while ((ent = FindEntityByClassname(ent, "prop_dynamic")) != -1)
+        {
+            if (IsValidEntity(ent))
+            {
+                char tName[64];
+                char modelName[64];
+                GetEntPropString(ent, Prop_Data, "m_iName", tName, sizeof(tName));
+                GetEntPropString(ent, Prop_Data, "m_ModelName", modelName, sizeof(modelName));
+                if
+                (
+                        StrContains(tName, "door", false)     != -1
+                     || StrContains(tName, "gate", false)     != -1
+                     || StrContains(modelName, "door", false) != -1
+                     || StrContains(modelName, "gate", false) != -1
+                )
+                {
+                    AcceptEntityInput(ent, "unlock", -1);
+                    AcceptEntityInput(ent, "open", -1);
+                    //RemoveEntity(ent);
+                    FixNearbyDoorRelatedThings(ent);
+                }
+            }
+        }
+    }
+}
+
+// remove any func_brushes that could be blockbullets and open area portals near those func_brushes
+void FixNearbyDoorRelatedThings(int ent)
+{
+    float doorLocation[3];
+    GetEntPropVector(ent, Prop_Send, "m_vecOrigin", doorLocation);
+    char brushName[32];
+    float brushLocation[3];
+    int iterEnt = -1;
+    while ((iterEnt = FindEntityByClassname(iterEnt, "func_brush")) != -1)
+    {
+        if (IsValidEntity(iterEnt))
+        {
+            GetEntPropVector(iterEnt, Prop_Send, "m_vecOrigin", brushLocation);
+            if (GetVectorDistance(doorLocation, brushLocation) < 50.0)
+            {
+                GetEntPropString(iterEnt, Prop_Data, "m_iName", brushName, sizeof(brushName));
+                if
+                (
+                    (StrContains(brushName, "bullet", false) != -1)
+                    ||
+                    (StrContains(brushName, "door", false) != -1)
+                )
+                {
+                    //RemoveEntity(iterEnt);
+                    AcceptEntityInput(iterEnt, "kill");
+                }
+            }
+        }
+    }
+    // iterate thru all area portals on the map and open them
+    // don't worry - the client immediately closes ones that aren't neccecary to be open. probably.
+    iterEnt = -1;
+    while ((iterEnt = FindEntityByClassname(iterEnt, "func_areaportal")) != -1)
+    {
+        if (IsValidEntity(iterEnt))
+        {
+            AcceptEntityInput(iterEnt, "Open");
+        }
+    }
 }
 
 /* ResetPlayers()
@@ -1299,8 +1382,8 @@ stock GetRealClientCount() {
 }
 
 DownloadConfig(const String:map[], const String:targetPath[]) {
-	decl String:url[256];
-	Format(url, sizeof(url), "https://raw.githubusercontent.com/Lange/SOAP-TF2DM/master/addons/sourcemod/configs/soap/%s.cfg", map);
+	char url[256];
+	Format(url, sizeof(url), "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/addons/sourcemod/configs/soap/%s.cfg", map);
 
 	new Handle:curl = curl_easy_init();
 	new Handle:output_file = curl_OpenFile(targetPath, "wb");
@@ -1317,8 +1400,8 @@ DownloadConfig(const String:map[], const String:targetPath[]) {
 }
 
 OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
-	decl String:map[128];
-	decl String:targetPath[128];
+	char map[128];
+	char targetPath[128];
 
 	ResetPack(hDLPack);
 	CloseHandle(Handle:ReadPackCell(hDLPack)); // output_file
