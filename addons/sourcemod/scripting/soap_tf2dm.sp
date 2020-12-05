@@ -98,7 +98,7 @@ new CURL_Default_opt[][2] = {
 
 // Entities to remove
 char g_entIter[][] =  {
-    "team_round_timer",                 // DISABLE      - Don't delete this ent, it WILL crash servers otherwise: https://crash.limetech.org/om2df7575vq3
+    "team_round_timer",                 // DISABLE      - Don't delete this ent, it WILL crash servers otherwise
     "team_control_point_master",        // DISABLE      - this ent causes weird behavior in DM servers if deleted. just disable
     "team_control_point",               // DISABLE      - No need to remove this, disabling works fine
     "tf_logic_koth",                    // DISABLE      - ^
@@ -1155,7 +1155,7 @@ DoAllEnts()
 
 public void OnEntityCreated(int entity, const char[] className)
 {
-    // iterate thru list of entities to check for the name of
+    // iterate thru list of entities to act on
     for (int i = 0; i < sizeof(g_entIter); i++)
     {
         // does it match any of the ents?
@@ -1272,7 +1272,7 @@ void OpenDoors()
     }
 }
 
-// remove any func_brushes that could be blockbullets and open all area portals
+// remove any func_brushes that could be blockbullets and open area portals near those func_brushes
 void FixNearbyDoorRelatedThings(int ent)
 {
     float doorLocation[3];
