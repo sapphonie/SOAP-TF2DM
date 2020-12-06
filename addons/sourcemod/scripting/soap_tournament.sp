@@ -29,6 +29,7 @@ public Plugin myinfo =
 // ====[ VARIABLES ]===================================================
 
 bool teamReadyState[2];
+bool dming;
 Handle redPlayersReady;
 Handle bluePlayersReady;
 Handle g_readymode_min;
@@ -85,9 +86,12 @@ public void OnPluginStart()
     bluePlayersReady = CreateArray();
 
     // add a global forward for other plugins to use
-    g_StopDeathMatching = CreateGlobalForward("SOAP_StopDeathMatching", ET_Event);
+    g_StopDeathMatching  = CreateGlobalForward("SOAP_StopDeathMatching", ET_Event);
     g_StartDeathMatching = CreateGlobalForward("SOAP_StartDeathMatching", ET_Event);
 
+    dming = false;
+
+    // start!
     StartDeathmatching();
 
     // forcibly unreadies teams on late load
@@ -118,6 +122,7 @@ void StopDeathmatching()
     PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " " ... COLOR_GREEN ... "%t", "Plugins unloaded");
     ClearArray(redPlayersReady);
     ClearArray(bluePlayersReady);
+    dming = false;
 }
 
 /* StartDeathmatching()
@@ -132,6 +137,7 @@ void StartDeathmatching()
     PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " " ... COLOR_RED ... "%t", "Plugins reloaded");
     ClearArray(redPlayersReady);
     ClearArray(bluePlayersReady);
+    dming = true;
 }
 
 // ====[ CALLBACKS ]===================================================
@@ -139,15 +145,17 @@ void StartDeathmatching()
 public void Event_TournamentStateupdate(Handle event, const char[] name, bool dontBroadcast)
 {
     // significantly more robust way of getting team ready status
-    teamReadyState[RED] = GameRules_GetProp("m_bTeamReady", 1, .element=2) != 0;
-    teamReadyState[BLU] = GameRules_GetProp("m_bTeamReady", 1, .element=3) != 0;
+    // the != 0 converts the result to a bool
+    teamReadyState[RED] = GameRules_GetProp("m_bTeamReady", 1, 2) != 0;
+    teamReadyState[BLU] = GameRules_GetProp("m_bTeamReady", 1, 3) != 0;
 
     // If both teams are ready, StopDeathmatching.
     if (teamReadyState[RED] && teamReadyState[BLU])
     {
         StopDeathmatching();
     }
-    else
+    // don't start deathmatching again if we're already dming!
+    else if (!dming)
     {
         // One or more of the teams isn't ready, StartDeathmatching.
         StartDeathmatching();
@@ -159,8 +167,8 @@ public Action Event_PlayerTeam(Handle event, const char[] name, bool dontBroadca
     int clientid = GetEventInt(event, "userid");
 
     // players switching teams unreadies teams without triggering tournament_stateupdate. Crutch!
-    teamReadyState[RED] = GameRules_GetProp("m_bTeamReady", 1, .element=2) != 0;
-    teamReadyState[BLU] = GameRules_GetProp("m_bTeamReady", 1, .element=3) != 0;
+    teamReadyState[RED] = GameRules_GetProp("m_bTeamReady", 1, 2) != 0;
+    teamReadyState[BLU] = GameRules_GetProp("m_bTeamReady", 1, 3) != 0;
 
     if (FindValueInArray(redPlayersReady, clientid) != -1)
     {

@@ -96,18 +96,20 @@ new CURL_Default_opt[][2] = {
     {_:CURLOPT_VERBOSE,0}
 };
 
-// Entities to remove
-char g_entIter[][] =  {
-    "team_round_timer",                 // DISABLE      - Don't delete this ent, it WILL crash servers otherwise
+// Entities to remove - don't worry! these all get reloaded on round start!
+// https://github.com/TheAlePower/TeamFortress2/blob/1b81dded673d49adebf4d0958e52236ecc28a956/tf2_src/game/shared/teamplayroundbased_gamerules.cpp#L328-L363
+char g_entIter[][] =
+{
+    "team_round_timer",                 // DISABLE      - Don't delete this ent, it will crash servers otherwise
     "team_control_point_master",        // DISABLE      - this ent causes weird behavior in DM servers if deleted. just disable
     "team_control_point",               // DISABLE      - No need to remove this, disabling works fine
     "tf_logic_koth",                    // DISABLE      - ^
-    "tf_logic_arena",                   // DELETE       - need to delete these, otherwise fight / spectate bullshit shows up on arena maps
     "logic_auto",                       // DISABLE      - ^
     "logic_relay",                      // DISABLE      - ^
     "item_teamflag",                    // DISABLE      - ^
-    "trigger_capture_area",             // TELEPORT     - we tele these ents out of the players reach (under the map by 5000 units) to disable them because theres issues with huds sometimes bugging out otherwise if theyre deleted
-    "func_regenerate",                  // DELETE       - deleting this ent is the only way to reliably prevent it from working in DM otherwise, and it gets reloaded on match start anyway
+    "trigger_capture_area",             // TELEPORT     - we tele these ents under the map by 5000 units to disable them - otherwise, huds bug out occasionally
+    "tf_logic_arena",                   // DELETE       - need to delete these, otherwise fight / spectate bullshit shows up on arena maps
+    "func_regenerate",                  // DELETE       - deleting this ent is the only way to reliably prevent it from working in DM otherwise
     "func_respawnroom",                 // DELETE       - ^
     "func_respawnroomvisualizer",       // DELETE       - ^
     "item_healthkit_full",              // DELETE       - ^
@@ -121,7 +123,7 @@ char g_entIter[][] =  {
 #define CURL_DEFAULT_OPT(%1) curl_easy_setopt_int_array(%1, CURL_Default_opt, sizeof(CURL_Default_opt))
 
 // ====[ PLUGIN ]======================================================
-public Plugin:myinfo = {
+public Plugin myinfo = {
     name           = PLUGIN_NAME,
     author         = PLUGIN_AUTHOR,
     description    = "Team deathmatch gameplay for TF2.",
@@ -271,7 +273,6 @@ public OnMapStart() {
             g_hRegenTimer[i] = INVALID_HANDLE;
         }
     }
-
     // Spawn system written by MikeJS.
     ClearArray(g_hRedSpawns);
     ClearArray(g_hBluSpawns);
@@ -436,7 +437,7 @@ public OnClientConnected(client) {
     ResetPlayerDmgBasedRegen(client, true);
 
     // Kills the annoying 30 second "waiting for players" at the start of a map.
-    ServerCommand("mp_waitingforplayers_cancel 1");
+    //ServerCommand("mp_waitingforplayers_cancel 1");
 }
 
 /* OnClientDisconnect()
@@ -458,84 +459,151 @@ public OnClientDisconnect(client) {
 public handler_ConVarChange(Handle:convar, const String:oldValue[], const String:newValue[]) {
     // When a cvar is changed during runtime, this is called and the corresponding internal variable is updated to reflect this change.
     // SourcePawn can't `switch` with Strings, so this huge if/else chain is our only option.
-    if (convar == g_hRegenHP){
+    if (convar == g_hRegenHP)
+    {
         g_iRegenHP = StringToInt(newValue);
-    } else if (convar == g_hRegenTick) {
+    }
+    else if (convar == g_hRegenTick)
+    {
         g_fRegenTick = StringToFloat(newValue);
-    } else if (convar == g_hRegenDelay) {
+    }
+    else if (convar == g_hRegenDelay)
+    {
         g_fRegenDelay = StringToFloat(newValue);
-    } else if (convar == g_hKillStartRegen) {
-        if (StringToInt(newValue) >= 1) {
+    }
+    else if (convar == g_hKillStartRegen)
+    {
+        if (StringToInt(newValue) >= 1)
+        {
             g_bKillStartRegen = true;
-        } else if (StringToInt(newValue) <= 0) {
+        }
+        else
+        {
             g_bKillStartRegen = false;
         }
-    } else if (convar == g_hSpawn) {
+    }
+    else if (convar == g_hSpawn)
+    {
         g_fSpawn = StringToFloat(newValue);
-    } else if (convar == g_hSpawnRandom) {
-        if (StringToInt(newValue) >= 1) {
+    }
+    else if (convar == g_hSpawnRandom)
+    {
+        if (StringToInt(newValue) >= 1)
+        {
             g_bSpawnRandom = true;
-        } else if (StringToInt(newValue) <= 0) {
+        }
+        else
+        {
             g_bSpawnRandom = false;
         }
-    } else if (convar == g_hTeamSpawnRandom) {
-        if (StringToInt(newValue) >= 1) {
+    }
+    else if (convar == g_hTeamSpawnRandom)
+    {
+        if (StringToInt(newValue) >= 1)
+        {
             g_bTeamSpawnRandom = true;
-        } else if (StringToInt(newValue) <= 0) {
+        }
+        else
+        {
             g_bTeamSpawnRandom = false;
         }
-    } else if (convar == g_hKillHealRatio) {
+    }
+    else if (convar == g_hKillHealRatio)
+    {
         g_fKillHealRatio = StringToFloat(newValue);
-    } else if (convar == g_hDamageHealRatio) {
+    }
+    else if (convar == g_hDamageHealRatio)
+    {
         g_fDamageHealRatio = StringToFloat(newValue);
         StartStopRecentDamagePushbackTimer();
-    } else if (convar == g_hKillHealStatic) {
+    }
+    else if (convar == g_hKillHealStatic)
+    {
         g_iKillHealStatic = StringToInt(newValue);
-    } else if (convar == g_hKillAmmo) {
-        if (StringToInt(newValue) >= 1) {
+    }
+    else if (convar == g_hKillAmmo)
+    {
+        if (StringToInt(newValue) >= 1)
+        {
             g_bKillAmmo = true;
-        } else if (StringToInt(newValue) <= 0) {
+        }
+        else
+        {
             g_bKillAmmo = false;
         }
-    } else if (convar == g_hForceTimeLimit) {
-        if (StringToInt(newValue) >= 1) {
+    }
+    else if (convar == g_hForceTimeLimit)
+    {
+        if (StringToInt(newValue) >= 1)
+        {
             g_bForceTimeLimit = true;
-        } else if (StringToInt(newValue) <= 0) {
+        }
+        else
+        {
             g_bForceTimeLimit = false;
         }
-    } else if (convar == g_hOpenDoors) {
-        if (StringToInt(newValue) >= 1) {
+    }
+    else if (convar == g_hOpenDoors)
+    {
+        if (StringToInt(newValue) >= 1)
+        {
             g_bOpenDoors = true;
             OpenDoors();
-        } else if (StringToInt(newValue) <= 0) {
+        }
+        else
+        {
             g_bOpenDoors = false;
+            ResetMap();
         }
-    } else if (convar == g_hDisableCabinet) {
-        if (StringToInt(newValue) >= 1) {
-            g_bDisableCabinet = true;
-            DoAllEnts();
-        } else if (StringToInt(newValue) <= 0) {
-            g_bDisableCabinet = false;
-        }
-    } else if (convar == g_hShowHP) {
-        if (StringToInt(newValue) >= 1) {
+    }
+    else if (convar == g_hShowHP)
+    {
+        if (StringToInt(newValue) >= 1)
+        {
             g_bShowHP = true;
-        } else if (StringToInt(newValue) <= 0) {
+        }
+        else
+        {
             g_bShowHP = false;
         }
-    } else if (convar == g_hDisableHealthPacks) {
-        if (StringToInt(newValue) >= 1) {
+    }
+    else if (convar == g_hDisableCabinet)
+    {
+        if (StringToInt(newValue) >= 1)
+        {
+            g_bDisableCabinet = true;
+            DoAllEnts();
+        }
+        else
+        {
+            g_bDisableCabinet = false;
+            ResetMap();
+        }
+    }
+    else if (convar == g_hDisableHealthPacks)
+    {
+        if (StringToInt(newValue) >= 1)
+        {
             g_bDisableHealthPacks = true;
             DoAllEnts();
-        } else if (StringToInt(newValue) <= 0) {
-            g_bDisableHealthPacks = false;
         }
-    } else if (convar == g_hDisableAmmoPacks) {
-        if (StringToInt(newValue) >= 1) {
+        else
+        {
+            g_bDisableHealthPacks = false;
+            ResetMap();
+        }
+    }
+    else if (convar == g_hDisableAmmoPacks)
+    {
+        if (StringToInt(newValue) >= 1)
+        {
             g_bDisableAmmoPacks = true;
             DoAllEnts();
-        } else if (StringToInt(newValue) <= 0) {
+        }
+        else
+        {
             g_bDisableAmmoPacks = false;
+            ResetMap();
         }
     }
 }
@@ -633,12 +701,18 @@ CreateTimeCheck() {
 public Action:RandomSpawn(Handle:timer, any:clientid) {
     new client = GetClientOfUserId(clientid); // UserIDs are passed through timers instead of client indexes because it ensures that no mismatches can happen as UserIDs are unique.
 
-    if (!IsValidClient(client)) {
+    if (!IsValidClient(client))
+    {
         return Plugin_Handled; // Client wasn't valid, so there's no point in trying to spawn it!
     }
 
-    if (IsPlayerAlive(client)) { // Can't teleport a dead player.
-        new team = GetClientTeam(client), Handle:array, size, Handle:spawns = CreateArray(), count = GetClientCount();
+    if (IsPlayerAlive(client))
+    { // Can't teleport a dead player.
+        int team = GetClientTeam(client);
+        Handle array;
+        int size;
+        Handle spawns = CreateArray();
+        int count = GetClientCount();
         float vectors[6];
         float origin[3];
         float angles[3];
@@ -649,23 +723,30 @@ public Action:RandomSpawn(Handle:timer, any:clientid) {
             // ...pick a random team!
             team = GetRandomInt(2, 3);
         }
-
-        if (team == 2) { // Is player on RED?
-            for (new i = 0; i <= count; i++) {
+        // Is player on RED?
+        if (team == 2)
+        {
+            for (new i = 0; i <= count; i++)
+            {
                 // Yep, get the RED spawns for this map.
                 array = GetArrayCell(g_hRedSpawns, i);
 
-                if (GetArraySize(array) != 0) {
+                if (GetArraySize(array) != 0)
+                {
                     size = PushArrayCell(spawns, array);
                 }
             }
         }
-        else { // Nope, they're on BLU.
-            for (new i = 0; i <= count; i++) {
+        // Nope, they're on BLU.
+        else
+        {
+            for (new i = 0; i <= count; i++)
+            {
                 // Get the BLU spawns.
                 array = GetArrayCell(g_hBluSpawns, i);
 
-                if (GetArraySize(array) != 0) {
+                if (GetArraySize(array) != 0)
+                {
                     size = PushArrayCell(spawns, array);
                 }
             }
@@ -686,7 +767,7 @@ public Action:RandomSpawn(Handle:timer, any:clientid) {
 
         /* Below is how players are prevented from spawning within one another. */
 
-        new Handle:trace = TR_TraceHullFilterEx(origin, origin, Float:{-24.0, -24.0, 0.0}, Float:{24.0, 24.0, 82.0}, MASK_PLAYERSOLID, TraceEntityFilterPlayers);
+        new Handle:trace = TR_TraceHullFilterEx(origin, origin, view_as<float>({-24.0, -24.0, 0.0}), view_as<float>({24.0, 24.0, 82.0}), MASK_PLAYERSOLID, TraceEntityFilterPlayers);
         // The above line creates a 'box' at the spawn point to be used. This box is roughly the size of a player.
 
         if (TR_DidHit(trace) && IsValidClient(TR_GetEntityIndex(trace))) {
@@ -694,7 +775,9 @@ public Action:RandomSpawn(Handle:timer, any:clientid) {
             CloseHandle(trace);
             CreateTimer(0.01, RandomSpawn, clientid, TIMER_FLAG_NO_MAPCHANGE); // Get a new spawn, because this one is occupied.
             return Plugin_Handled;
-        } else {
+        }
+        else
+        {
             // All clear.
             TF2_RemoveCondition(client, TFCond_UberchargedHidden);
             TeleportEntity(client, origin, angles, NULL_VECTOR); // Teleport the player to their spawn point.
@@ -1137,7 +1220,32 @@ LockMap()
     ResetPlayers();
 }
 
-DoAllEnts()
+// Reload map, deleting and recreating most entities
+// written by nanochip, modified by me
+ResetMap()
+{
+    SetConVarInt(FindConVar("mp_restartgame_immediate"), 1);
+    // remove waiting for players time
+    SetConVarInt(FindConVar("mp_waitingforplayers_time"), 0);
+    PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " Resetting map.");
+
+    if (GetConVarInt(FindConVar("mp_timelimit")) <= 0)
+    {
+        return;
+    }
+    int timeleft;
+    GetMapTimeLeft(timeleft);
+    int mins = timeleft / 60;
+    int secs = timeleft % 60;
+    if (secs >= 30)
+    {
+        mins = mins+1;
+    }
+    SetConVarInt(FindConVar("mp_timelimit"), mins);
+}
+
+// func to iterate thru all ents and act on them with DoEnt()
+void DoAllEnts()
 {
     // iterate thru list of entities to act on
     for (int i = 0; i < sizeof(g_entIter); i++)
@@ -1145,33 +1253,22 @@ DoAllEnts()
         // init variable
         int ent = -1;
         // does this entity exist?
-        ent = FindEntityByClassname(ent, g_entIter[i]);
-        if (ent != -1)
+        while ((ent = FindEntityByClassname(ent, g_entIter[i])) > 0)
         {
-            DoEnt(i, ent);
+            if (IsValidEntity(ent) && ent > 0)
+            {
+                //LogMessage("ent %i found", ent);
+                DoEnt(i, ent);
+            }
         }
     }
 }
 
-public void OnEntityCreated(int entity, const char[] className)
-{
-    // iterate thru list of entities to act on
-    for (int i = 0; i < sizeof(g_entIter); i++)
-    {
-        // does it match any of the ents?
-        if (StrEqual(className, g_entIter[i]))
-        {
-            // yes! run DoEnt
-            DoEnt(i, entity);
-            // break out of the loop
-            break;
-        }
-    }
-}
-
+// act on the ents: requires iterator #  and entityid
 DoEnt(int i, int entity)
 {
-    if (IsValidEntity(entity)) {
+    if (IsValidEntity(entity))
+    {
         // remove arena logic (disabling doesn't properly disable the fight / spectate bullshit)
         if (StrContains(g_entIter[i], "tf_logic_arena", false) != -1)
         {
@@ -1185,6 +1282,7 @@ DoEnt(int i, int entity)
                 RemoveEntity(entity);
             }
         }
+        // if ent is a respawn room (allows for resupping!) AND cabinets are off, remove it. otherwise skip
         else if (StrContains(g_entIter[i], "func_respawnroom", false) != -1)
         {
             if (g_bDisableCabinet)
@@ -1222,11 +1320,27 @@ DoEnt(int i, int entity)
     }
 }
 
+// catch ents that spawn after map start / plugin load
+public void OnEntityCreated(int entity, const char[] className)
+{
+    // iterate thru list of entities to act on
+    for (int i = 0; i < sizeof(g_entIter); i++)
+    {
+        // does it match any of the ents?
+        if (StrEqual(className, g_entIter[i]))
+        {
+            // yes! run DoEnt
+            DoEnt(i, entity);
+            // break out of the loop
+            break;
+        }
+    }
+}
+
 /* OpenDoors() - rewritten by nanochip and stephanie
  *
  * Initially forces all doors open and keeps them unlocked even when they close.
  * -------------------------------------------------------------------------- */
-
 void OpenDoors()
 {
     if (g_bOpenDoors)
@@ -1239,7 +1353,6 @@ void OpenDoors()
             {
                 AcceptEntityInput(ent, "unlock", -1);
                 AcceptEntityInput(ent, "open", -1);
-                //RemoveEntity(ent);
                 FixNearbyDoorRelatedThings(ent);
             }
         }
@@ -1250,21 +1363,46 @@ void OpenDoors()
         {
             if (IsValidEntity(ent))
             {
-                char tName[64];
+                char iName[64];
                 char modelName[64];
-                GetEntPropString(ent, Prop_Data, "m_iName", tName, sizeof(tName));
+                GetEntPropString(ent, Prop_Data, "m_iName", iName, sizeof(iName));
                 GetEntPropString(ent, Prop_Data, "m_ModelName", modelName, sizeof(modelName));
                 if
                 (
-                        StrContains(tName, "door", false)     != -1
-                     || StrContains(tName, "gate", false)     != -1
-                     || StrContains(modelName, "door", false) != -1
-                     || StrContains(modelName, "gate", false) != -1
+                        StrContains(iName, "door", false)       != -1
+                     || StrContains(iName, "gate", false)       != -1
+                     || StrContains(iName, "exit", false)       != -1
+                     || StrContains(iName, "grate", false)      != -1
+                     || StrContains(modelName, "door", false)   != -1
+                     || StrContains(modelName, "gate", false)   != -1
+                     || StrContains(modelName, "exit", false)   != -1
+                     || StrContains(modelName, "grate", false)  != -1
                 )
                 {
                     AcceptEntityInput(ent, "unlock", -1);
                     AcceptEntityInput(ent, "open", -1);
-                    //RemoveEntity(ent);
+                    FixNearbyDoorRelatedThings(ent);
+                }
+            }
+        }
+        // reset ent
+        ent = -1;
+        // search for all other possible doors
+        while ((ent = FindEntityByClassname(ent, "func_brush")) != -1)
+        {
+            if (IsValidEntity(ent))
+            {
+                char brushName[64];
+                GetEntPropString(ent, Prop_Data, "m_iName", brushName, sizeof(brushName));
+                if
+                (
+                        StrContains(brushName, "door", false)   != -1
+                     || StrContains(brushName, "gate", false)   != -1
+                     || StrContains(brushName, "exit", false)   != -1
+                     || StrContains(brushName, "grate", false)  != -1
+                )
+                {
+                    RemoveEntity(ent);
                     FixNearbyDoorRelatedThings(ent);
                 }
             }
@@ -1276,31 +1414,32 @@ void OpenDoors()
 void FixNearbyDoorRelatedThings(int ent)
 {
     float doorLocation[3];
-    GetEntPropVector(ent, Prop_Send, "m_vecOrigin", doorLocation);
-    char brushName[32];
     float brushLocation[3];
+
+    GetEntPropVector(ent, Prop_Send, "m_vecOrigin", doorLocation);
+
     int iterEnt = -1;
-    while ((iterEnt = FindEntityByClassname(iterEnt, "func_brush")) != -1)
+    while ((iterEnt = FindEntityByClassname(iterEnt, "func_brush")) > 0)
     {
         if (IsValidEntity(iterEnt))
         {
             GetEntPropVector(iterEnt, Prop_Send, "m_vecOrigin", brushLocation);
             if (GetVectorDistance(doorLocation, brushLocation) < 50.0)
             {
+                char brushName[32];
                 GetEntPropString(iterEnt, Prop_Data, "m_iName", brushName, sizeof(brushName));
                 if
                 (
-                    StrContains(brushName, "bullet", false) != -1
-                    ||
-                    StrContains(brushName, "door", false) != -1
+                        StrContains(brushName, "bullet", false) != -1
+                     || StrContains(brushName, "door", false)   != -1
                 )
                 {
-                    //RemoveEntity(iterEnt);
-                    AcceptEntityInput(iterEnt, "kill");
+                    RemoveEntity(iterEnt);
                 }
             }
         }
     }
+
     // iterate thru all area portals on the map and open them
     // don't worry - the client immediately closes ones that aren't neccecary to be open. probably.
     iterEnt = -1;
@@ -1317,7 +1456,7 @@ void FixNearbyDoorRelatedThings(int ent)
  *
  * Can respawn or reset regen-over-time on all players.
  * -------------------------------------------------------------------------- */
-ResetPlayers() {
+void ResetPlayers() {
     new id;
     if (FirstLoad == true) {
         for (new i = 0; i < MaxClients; i++) {
@@ -1366,34 +1505,16 @@ ResetPlayerDmgBasedRegen(client, bool:alsoResetTaken = false) {
  *
  * Checks if a client is valid.
  * -------------------------------------------------------------------------- */
-bool:IsValidClient(iClient) {
-    if (iClient < 1 || iClient > MaxClients) {
-        return false;
-    } if (!IsClientConnected(iClient)) {
-        return false;
-    }
-
-    return IsClientInGame(iClient);
-}
-
-/* FindEntityByClassname2()
- *
- * Finds entites, and won't error out when searching invalid entities.
- * -------------------------------------------------------------------------- */
-stock FindEntityByClassname2(startEnt, const String:classname[]) {
-    /* If startEnt isn't valid, shift it back to the nearest valid one */
-    while (startEnt > -1 && !IsValidEntity(startEnt)) {
-        startEnt--;
-    }
-
-    return FindEntityByClassname(startEnt, classname);
+bool IsValidClient(int client)
+{
+    return ((0 < client <= MaxClients) && IsClientInGame(client) && !IsFakeClient(client));
 }
 
 /* GetRealClientCount()
  *
  * Gets the number of clients connected to the game..
  * -------------------------------------------------------------------------- */
-stock GetRealClientCount() {
+GetRealClientCount() {
     new clients = 0;
 
     for (new i = 1; i <= MaxClients; i++) {
@@ -1455,6 +1576,7 @@ OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
  *
  * When the plugin shuts down.
  * -------------------------------------------------------------------------- */
-public OnPluginEnd() {
+public OnPluginEnd()
+{
     PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " Soap DM unloaded.");
 }
