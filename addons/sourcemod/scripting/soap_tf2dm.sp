@@ -15,7 +15,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.1.2"
+#define PLUGIN_VERSION      "4.1.3b"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://steamcommunity.com/id/langeh/, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -402,23 +402,23 @@ public OnMapEnd() {
  * -------------------------------------------------------------------------- */
 public OnConfigsExecuted() {
     // Get the values for internal global variables.
-    g_iRegenHP = GetConVarInt(g_hRegenHP);
-    g_fRegenTick = GetConVarFloat(g_hRegenTick);
-    g_fRegenDelay = GetConVarFloat(g_hRegenDelay);
-    g_bKillStartRegen = GetConVarBool(g_hKillStartRegen);
-    g_fSpawn = GetConVarFloat(g_hSpawn);
-    g_bSpawnRandom = GetConVarBool(g_hSpawnRandom);
-    g_fKillHealRatio = GetConVarFloat(g_hKillHealRatio);
-    g_fDamageHealRatio = GetConVarFloat(g_hDamageHealRatio);
+    g_iRegenHP              = GetConVarInt(g_hRegenHP);
+    g_fRegenTick            = GetConVarFloat(g_hRegenTick);
+    g_fRegenDelay           = GetConVarFloat(g_hRegenDelay);
+    g_bKillStartRegen       = GetConVarBool(g_hKillStartRegen);
+    g_fSpawn                = GetConVarFloat(g_hSpawn);
+    g_bSpawnRandom          = GetConVarBool(g_hSpawnRandom);
+    g_fKillHealRatio        = GetConVarFloat(g_hKillHealRatio);
+    g_fDamageHealRatio      = GetConVarFloat(g_hDamageHealRatio);
     StartStopRecentDamagePushbackTimer();
-    g_iKillHealStatic = GetConVarInt(g_hKillHealStatic);
-    g_bKillAmmo = GetConVarBool(g_hKillAmmo);
-    g_bOpenDoors = GetConVarBool(g_hOpenDoors);
-    g_bDisableCabinet = GetConVarBool(g_hDisableCabinet);
-    g_bShowHP = GetConVarBool(g_hShowHP);
-    g_bForceTimeLimit = GetConVarBool(g_hForceTimeLimit);
-    g_bDisableHealthPacks = GetConVarBool(g_hDisableHealthPacks);
-    g_bDisableAmmoPacks = GetConVarBool(g_hDisableAmmoPacks);
+    g_iKillHealStatic       = GetConVarInt(g_hKillHealStatic);
+    g_bKillAmmo             = GetConVarBool(g_hKillAmmo);
+    g_bOpenDoors            = GetConVarBool(g_hOpenDoors);
+    g_bDisableCabinet       = GetConVarBool(g_hDisableCabinet);
+    g_bShowHP               = GetConVarBool(g_hShowHP);
+    g_bForceTimeLimit       = GetConVarBool(g_hForceTimeLimit);
+    g_bDisableHealthPacks   = GetConVarBool(g_hDisableHealthPacks);
+    g_bDisableAmmoPacks     = GetConVarBool(g_hDisableAmmoPacks);
 }
 
 
@@ -438,6 +438,7 @@ public OnClientConnected(client) {
 
     // Kills the annoying 30 second "waiting for players" at the start of a map.
     //ServerCommand("mp_waitingforplayers_cancel 1");
+    SetConVarInt(FindConVar("mp_waitingforplayers_time"), 0);
 }
 
 /* OnClientDisconnect()
@@ -1347,7 +1348,7 @@ void OpenDoors()
     {
         int ent = -1;
         // search for all func doors
-        while ((ent = FindEntityByClassname(ent, "func_door")) != -1)
+        while ((ent = FindEntityByClassname(ent, "func_door")) > 0)
         {
             if (IsValidEntity(ent))
             {
@@ -1359,7 +1360,7 @@ void OpenDoors()
         // reset ent
         ent = -1;
         // search for all other possible doors
-        while ((ent = FindEntityByClassname(ent, "prop_dynamic")) != -1)
+        while ((ent = FindEntityByClassname(ent, "prop_dynamic")) > 0)
         {
             if (IsValidEntity(ent))
             {
@@ -1388,7 +1389,7 @@ void OpenDoors()
         // reset ent
         ent = -1;
         // search for all other possible doors
-        while ((ent = FindEntityByClassname(ent, "func_brush")) != -1)
+        while ((ent = FindEntityByClassname(ent, "func_brush")) > 0)
         {
             if (IsValidEntity(ent))
             {
@@ -1443,7 +1444,7 @@ void FixNearbyDoorRelatedThings(int ent)
     // iterate thru all area portals on the map and open them
     // don't worry - the client immediately closes ones that aren't neccecary to be open. probably.
     iterEnt = -1;
-    while ((iterEnt = FindEntityByClassname(iterEnt, "func_areaportal")) != -1)
+    while ((iterEnt = FindEntityByClassname(iterEnt, "func_areaportal")) > 0)
     {
         if (IsValidEntity(iterEnt))
         {
@@ -1514,11 +1515,14 @@ bool IsValidClient(int client)
  *
  * Gets the number of clients connected to the game..
  * -------------------------------------------------------------------------- */
-GetRealClientCount() {
-    new clients = 0;
+GetRealClientCount()
+{
+    int clients = 0;
 
-    for (new i = 1; i <= MaxClients; i++) {
-        if (IsValidClient(i)) {
+    for (int i = 1; i <= MaxClients; i++)
+    {
+        if (IsValidClient(i))
+        {
             clients++;
         }
     }
@@ -1526,15 +1530,16 @@ GetRealClientCount() {
     return clients;
 }
 
-DownloadConfig(const String:map[], const String:targetPath[]) {
+DownloadConfig(const char[] map, const char[] targetPath)
+{
     char url[256];
     Format(url, sizeof(url), "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/addons/sourcemod/configs/soap/%s.cfg", map);
 
-    new Handle:curl = curl_easy_init();
-    new Handle:output_file = curl_OpenFile(targetPath, "wb");
+    Handle curl         = curl_easy_init();
+    Handle output_file  = curl_OpenFile(targetPath, "wb");
     CURL_DEFAULT_OPT(curl);
 
-    new Handle:hDLPack = CreateDataPack();
+    Handle hDLPack = CreateDataPack();
     WritePackCell(hDLPack, _:output_file);
     WritePackString(hDLPack, map);
     WritePackString(hDLPack, targetPath);
@@ -1555,17 +1560,23 @@ OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
     CloseHandle(hDLPack);
     CloseHandle(hndl);
 
-    if (code != CURLE_OK) {
+    if (code != CURLE_OK)
+    {
         DeleteFile(targetPath);
         SetFailState("Map spawns missing. Map: %s, failed to download config", map);
         LogError("Failed to download config for: %s", map);
-    } else {
-        if (FileSize(targetPath) < 256) {
+    }
+    else
+    {
+        if (FileSize(targetPath) < 256)
+        {
             DeleteFile(targetPath);
             SetFailState("Map spawns missing. Map: %s, failed to download config", map);
             LogError("Failed to download config for: %s", map);
             return;
-        } else {
+        }
+        else
+        {
             PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " Successfully downloaded config %s.", map);
             LoadMapConfig(map, targetPath);
         }
