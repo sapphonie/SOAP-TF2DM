@@ -10,8 +10,8 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP Tournament"
 #define PLUGIN_AUTHOR       "Lange - maintained by sappho.io"
-#define PLUGIN_VERSION      "3.8.2"
-#define PLUGIN_CONTACT      "https://steamcommunity.com/id/langeh/"
+#define PLUGIN_VERSION      "3.8.3"
+#define PLUGIN_CONTACT      "https://sappho.io"
 #define RED                 0
 #define BLU                 1
 #define TEAM_OFFSET         2
@@ -107,6 +107,7 @@ public void OnMapStart()
     teamReadyState[RED] = false;
     teamReadyState[BLU] = false;
 
+    dming = false;
     StartDeathmatching();
 }
 
