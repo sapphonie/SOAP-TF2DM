@@ -33,8 +33,8 @@ ArrayList redPlayersReady;
 ArrayList bluePlayersReady;
 ConVar g_readymode_min;
 // global forward handle;
-Handle g_StopDeathMatching;
-Handle g_StartDeathMatching;
+GlobalForward g_fwStopDeathMatching;
+GlobalForward g_fwStartDeathMatching;
 // ConVars
 ConVar g_cvReadyModeCountdown;
 ConVar g_cvEnforceReadyModeCountdown;
@@ -86,8 +86,8 @@ public void OnPluginStart()
     bluePlayersReady = new ArrayList();
 
     // add a global forward for other plugins to use
-    g_StopDeathMatching = CreateGlobalForward("SOAP_StopDeathMatching", ET_Event);
-    g_StartDeathMatching = CreateGlobalForward("SOAP_StartDeathMatching", ET_Event);
+    g_fwStopDeathMatching = new GlobalForward("SOAP_StopDeathMatching", ET_Event);
+    g_fwStartDeathMatching = new GlobalForward("SOAP_StartDeathMatching", ET_Event);
 
     StartDeathmatching();
 
@@ -113,7 +113,7 @@ public void OnMapStart()
  * -------------------------------------------------------------------------- */
 void StopDeathmatching()
 {
-    Call_StartForward(g_StopDeathMatching);
+    Call_StartForward(g_fwStopDeathMatching);
     Call_Finish();
     ServerCommand("exec sourcemod/soap_live.cfg");
     PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " " ... COLOR_GREEN ... "%t", "Plugins unloaded");
@@ -127,7 +127,7 @@ void StopDeathmatching()
  * -------------------------------------------------------------------------- */
 void StartDeathmatching()
 {
-    Call_StartForward(g_StartDeathMatching);
+    Call_StartForward(g_fwStartDeathMatching);
     Call_Finish();
     ServerCommand("exec sourcemod/soap_notlive.cfg");
     PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " " ... COLOR_RED ... "%t", "Plugins reloaded");
