@@ -29,9 +29,9 @@ public Plugin myinfo =
 // ====[ VARIABLES ]===================================================
 
 bool teamReadyState[2];
-Handle redPlayersReady;
-Handle bluePlayersReady;
-Handle g_readymode_min;
+ArrayList redPlayersReady;
+ArrayList bluePlayersReady;
+ConVar g_readymode_min;
 // global forward handle;
 Handle g_StopDeathMatching;
 Handle g_StartDeathMatching;
@@ -77,12 +77,13 @@ public void OnPluginStart()
     g_cvReadyModeCountdown = FindConVar("mp_tournament_readymode_countdown");
     g_readymode_min = FindConVar("mp_tournament_readymode_min");
 
-    SetConVarInt(g_cvReadyModeCountdown, 5, true, true);
-    HookConVarChange(g_cvEnforceReadyModeCountdown, handler_ConVarChange);
-    HookConVarChange(g_cvReadyModeCountdown, handler_ConVarChange);
+    g_cvReadyModeCountdown.SetInt(5, true, true);
+    
+    g_cvEnforceReadyModeCountdown.AddChangeHook(handler_ConVarChange);
+    g_cvReadyModeCountdown.AddChangeHook(handler_ConVarChange);
 
-    redPlayersReady = CreateArray();
-    bluePlayersReady = CreateArray();
+    redPlayersReady = new ArrayList();
+    bluePlayersReady = new ArrayList();
 
     // add a global forward for other plugins to use
     g_StopDeathMatching = CreateGlobalForward("SOAP_StopDeathMatching", ET_Event);
@@ -116,8 +117,8 @@ void StopDeathmatching()
     Call_Finish();
     ServerCommand("exec sourcemod/soap_live.cfg");
     PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " " ... COLOR_GREEN ... "%t", "Plugins unloaded");
-    ClearArray(redPlayersReady);
-    ClearArray(bluePlayersReady);
+    redPlayersReady.Clear();
+    bluePlayersReady.Clear();
 }
 
 /* StartDeathmatching()
@@ -130,13 +131,12 @@ void StartDeathmatching()
     Call_Finish();
     ServerCommand("exec sourcemod/soap_notlive.cfg");
     PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " " ... COLOR_RED ... "%t", "Plugins reloaded");
-    ClearArray(redPlayersReady);
-    ClearArray(bluePlayersReady);
+    redPlayersReady.Clear();
+    bluePlayersReady.Clear();
 }
-
 // ====[ CALLBACKS ]===================================================
 
-public void Event_TournamentStateupdate(Handle event, const char[] name, bool dontBroadcast)
+public void Event_TournamentStateupdate(Event event, const char[] name, bool dontBroadcast)
 {
     // significantly more robust way of getting team ready status
     teamReadyState[RED] = GameRules_GetProp("m_bTeamReady", 1, .element=2) != 0;
@@ -154,25 +154,25 @@ public void Event_TournamentStateupdate(Handle event, const char[] name, bool do
     }
 }
 
-public Action Event_PlayerTeam(Handle event, const char[] name, bool dontBroadcast)
+public Action Event_PlayerTeam(Event event, const char[] name, bool dontBroadcast)
 {
-    int clientid = GetEventInt(event, "userid");
+    int clientid = event.GetInt("userid");
 
     // players switching teams unreadies teams without triggering tournament_stateupdate. Crutch!
     teamReadyState[RED] = GameRules_GetProp("m_bTeamReady", 1, .element=2) != 0;
     teamReadyState[BLU] = GameRules_GetProp("m_bTeamReady", 1, .element=3) != 0;
 
-    if (FindValueInArray(redPlayersReady, clientid) != -1)
+    if (redPlayersReady.FindValue(clientid) != -1)
     {
-        RemoveFromArray(redPlayersReady, FindValueInArray(redPlayersReady, clientid));
+        redPlayersReady.Erase(redPlayersReady.FindValue(clientid));
     }
-    else if (FindValueInArray(bluePlayersReady, clientid) != -1)
+    else if (bluePlayersReady.FindValue(clientid) != -1)
     {
-        RemoveFromArray(bluePlayersReady, FindValueInArray(bluePlayersReady, clientid));
+        bluePlayersReady.Erase(bluePlayersReady.FindValue(clientid));
     }
 }
 
-public Action Event_GameOver(Handle event, const char[] name, bool dontBroadcast)
+public Action Event_GameOver(Event event, const char[] name, bool dontBroadcast)
 {
     teamReadyState[RED] = false;
     teamReadyState[BLU] = false;
@@ -186,22 +186,22 @@ public Action TournamentRestartHook(int args)
     StartDeathmatching();
 }
 
-public void handler_ConVarChange(Handle convar, const char[] oldValue, const char[] newValue)
+public void handler_ConVarChange(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-    if (convar == g_cvReadyModeCountdown && GetConVarBool(g_cvEnforceReadyModeCountdown))
+    if (convar == g_cvReadyModeCountdown && g_cvEnforceReadyModeCountdown.BoolValue)
     {
-        SetConVarInt(g_cvReadyModeCountdown, 5, true, true);
+        g_cvReadyModeCountdown.SetInt(5, true, true);
     }
     if (convar == g_cvEnforceReadyModeCountdown && StringToInt(newValue) == 1)
     {
-        SetConVarInt(g_cvReadyModeCountdown, 5, true, true);
+        g_cvReadyModeCountdown.SetInt(5, true, true);
     }
 }
 
 public Action Listener_TournamentPlayerReadystate(int client, const char[] command, int args)
 {
     char arg[4];
-    int min = GetConVarInt(g_readymode_min);
+    int min = g_readymode_min.IntValue;
     int clientid = GetClientUserId(client);
     int clientTeam = GetClientTeam(client);
 
@@ -210,25 +210,25 @@ public Action Listener_TournamentPlayerReadystate(int client, const char[] comma
     {
         if (clientTeam - TEAM_OFFSET == 0)
         {
-            PushArrayCell(redPlayersReady, clientid);
+            redPlayersReady.Push(clientid);
         }
         else if (clientTeam - TEAM_OFFSET == 1)
         {
-            PushArrayCell(bluePlayersReady, clientid);
+            bluePlayersReady.Push(clientid);
         }
     }
     else if (StrEqual(arg, "0"))
     {
         if (clientTeam - TEAM_OFFSET == 0)
         {
-            RemoveFromArray(redPlayersReady, FindValueInArray(redPlayersReady, clientid));
+            redPlayersReady.Erase(redPlayersReady.FindValue(clientid));
         }
         else if (clientTeam - TEAM_OFFSET == 1)
         {
-            RemoveFromArray(bluePlayersReady, FindValueInArray(bluePlayersReady, clientid));
+            bluePlayersReady.Erase(bluePlayersReady.FindValue(clientid));
         }
     }
-    if (GetArraySize(redPlayersReady) == min && GetArraySize(bluePlayersReady) == min)
+    if (redPlayersReady.Length == min && bluePlayersReady.Length == min)
     {
         StopDeathmatching();
     }
