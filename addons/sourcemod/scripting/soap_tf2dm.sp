@@ -15,7 +15,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.1.4b"
+#define PLUGIN_VERSION      "4.1.2"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -1508,7 +1508,7 @@ ResetPlayerDmgBasedRegen(client, bool:alsoResetTaken = false) {
  * -------------------------------------------------------------------------- */
 bool IsValidClient(int client)
 {
-    return ((0 < client <= MaxClients) && IsClientInGame(client) && !IsFakeClient(client));
+    return ((0 < client <= MaxClients) && IsClientInGame(client));
 }
 
 /* GetRealClientCount()
