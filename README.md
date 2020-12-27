@@ -23,7 +23,6 @@ If a specific version of a map does not have spawn points, deathmatch mode does 
 
 ## Known issues
 
-- Toggling `soap_disablehealthpacks`, `soap_disableammopacks`, or `soap_disablecabinet` requires a map change to take effect.
 - Not an issue, but, this plugin requires [SourceMod 1.10](https://www.sourcemod.net/downloads.php) or newer to function. If you are using an older version, __it will not load__.
 
 Report other issues [here](https://github.com/sapphonie/SOAP-TF2DM/issues/new).
