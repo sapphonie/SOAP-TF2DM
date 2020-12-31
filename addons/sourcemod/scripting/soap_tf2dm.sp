@@ -15,7 +15,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.1.2"
+#define PLUGIN_VERSION      "4.1.3"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -419,6 +419,11 @@ public OnConfigsExecuted() {
     g_bForceTimeLimit       = GetConVarBool(g_hForceTimeLimit);
     g_bDisableHealthPacks   = GetConVarBool(g_hDisableHealthPacks);
     g_bDisableAmmoPacks     = GetConVarBool(g_hDisableAmmoPacks);
+
+    // reexec map config after grabbing cvars - for dm servers, to customize cvars per map etc.
+    char map[64];
+    GetCurrentMap(map, sizeof(map));
+    ServerCommand("exec %s", map);
 }
 
 
