@@ -15,7 +15,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.1.3"
+#define PLUGIN_VERSION      "4.1.4"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -1234,20 +1234,6 @@ ResetMap()
     // remove waiting for players time
     SetConVarInt(FindConVar("mp_waitingforplayers_time"), 0);
     PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " Resetting map.");
-
-    if (GetConVarInt(FindConVar("mp_timelimit")) <= 0)
-    {
-        return;
-    }
-    int timeleft;
-    GetMapTimeLeft(timeleft);
-    int mins = timeleft / 60;
-    int secs = timeleft % 60;
-    if (secs >= 30)
-    {
-        mins = mins+1;
-    }
-    SetConVarInt(FindConVar("mp_timelimit"), mins);
 }
 
 // func to iterate thru all ents and act on them with DoEnt()
