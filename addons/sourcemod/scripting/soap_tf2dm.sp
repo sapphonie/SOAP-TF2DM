@@ -93,10 +93,6 @@ bool g_bNoVelocityOnSpawn;
 Handle g_hDebugSpawns;
 int g_iDebugSpawns;
 
-// invalid spawns
-Handle g_hFailIfInvalidSpawn;
-bool g_bFailIfInvalidSpawn;
-
 
 // i don't care
 Handle Timer_ShowSpawns;
@@ -179,7 +175,8 @@ public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max
  *
  * When the plugin starts up.
  * -------------------------------------------------------------------------- */
-public OnPluginStart() {
+public OnPluginStart()
+{
     MC_PrintToChatAll(SOAP_TAG ... "Soap DM loaded.");
     g_bAFKSupported = LibraryExists("afk");
     g_bcURLSupported = GetExtensionFileStatus("curl.ext") == 1 ? true : false;
@@ -212,7 +209,6 @@ public OnPluginStart() {
     g_hDisableAmmoPacks     = CreateConVar("soap_disableammopacks", "0", "Disables the ammo packs on map load.", FCVAR_NOTIFY);
     g_hNoVelocityOnSpawn    = CreateConVar("soap_novelocityonspawn", "1", "Prevents players from inheriting their velocity from previous lives when spawning thru SOAP.", FCVAR_NOTIFY);
     g_hDebugSpawns          = CreateConVar("soap_debugspawns", "0", "Set to 1 to draw boxes around spawn points when players spawn. Set to 2 to draw ALL spawn points constantly. For debugging.", FCVAR_NOTIFY, true, 0.0, true, 2.0);
-    g_hFailIfInvalidSpawn   = CreateConVar("soap_failifinvalidspawn", "0", "If 1, plugin will fail if it encounters a spawn outside of or clipping into the world. If 0, it will only log an error.", FCVAR_NOTIFY);
 
     // Hook convar changes and events
     HookConVarChange(g_hRegenHP,            handler_ConVarChange);
@@ -234,7 +230,6 @@ public OnPluginStart() {
     HookConVarChange(g_hDisableAmmoPacks,   handler_ConVarChange);
     HookConVarChange(g_hNoVelocityOnSpawn,  handler_ConVarChange);
     HookConVarChange(g_hDebugSpawns,        handler_ConVarChange);
-    HookConVarChange(g_hFailIfInvalidSpawn, handler_ConVarChange);
 
 
     HookEvent("player_death", Event_player_death);
@@ -307,6 +302,20 @@ public OnMapStart() {
             g_hRegenTimer[i] = null;
         }
     }
+
+    // init our spawn system
+    InitSpawnSys();
+
+    // Load the sound file played when a player is spawned.
+    PrecacheSound("items/spawn_item.wav", true);
+
+    // Begin the time check that prevents infinite rounds on A/D and KOTH maps.
+    CreateTimeCheck();
+}
+
+
+void InitSpawnSys()
+{
     // Spawn system written by MikeJS.
     // note from the future - mikejs had this plugin making literally 33 copies of the spawn config file
     // for no goddamn reason
@@ -352,12 +361,6 @@ public OnMapStart() {
         }
     }
     // End spawn system.
-
-    // Load the sound file played when a player is spawned.
-    PrecacheSound("items/spawn_item.wav", true);
-
-    // Begin the time check that prevents infinite rounds on A/D and KOTH maps.
-    CreateTimeCheck();
 }
 
 // lmfao dude kill me
@@ -483,7 +486,6 @@ public OnConfigsExecuted()
         delete Timer_ShowSpawns;
         Timer_ShowSpawns = CreateTimer(0.1, DebugShowSpawns, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
     }
-    g_bFailIfInvalidSpawn       = GetConVarBool(g_hFailIfInvalidSpawn);
     // reexec map config after grabbing cvars - for dm servers, to customize cvars per map etc.
     char map[64];
     GetCurrentMap(map, sizeof(map));
@@ -689,6 +691,7 @@ public handler_ConVarChange(Handle:convar, const String:oldValue[], const String
     }
     else if (convar == g_hDebugSpawns)
     {
+        InitSpawnSys();
         if (StringToInt(newValue) <= 0)
         {
             g_iDebugSpawns = 0;
@@ -703,17 +706,6 @@ public handler_ConVarChange(Handle:convar, const String:oldValue[], const String
             LogMessage("doing debug spawns");
             delete Timer_ShowSpawns;
             Timer_ShowSpawns = CreateTimer(0.1, DebugShowSpawns, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
-        }
-    }
-    else if (convar == g_hFailIfInvalidSpawn)
-    {
-        if (StringToInt(newValue) >= 1)
-        {
-            g_bFailIfInvalidSpawn = true;
-        }
-        else
-        {
-            g_bFailIfInvalidSpawn = false;
         }
     }
 }
@@ -836,13 +828,16 @@ public Action RandomSpawn(Handle timer, any clientid)
 
     // total number of spawns on team <x>
     int numofspawns;
+
+    // random number that we generate later
+    int rand;
     // Is player on RED?
     if (team == 2)
     {
         // Yep, get the amt of RED spawns for this map
         numofspawns = GetArraySize(g_hRedSpawns);
         // random number = random spawn to put player in
-        int rand = GetRandomInt(0, numofspawns - 1);
+        rand = GetRandomInt(0, numofspawns - 1);
         // get the spawn vectors and put them in our vector var
         GetArrayArray(g_hRedSpawns, rand, vectors);
     }
@@ -852,7 +847,7 @@ public Action RandomSpawn(Handle timer, any clientid)
         // get the amt of BLU spawns for this map
         numofspawns = GetArraySize(g_hBluSpawns);
         // random number = random spawn to put player in
-        int rand = GetRandomInt(0, numofspawns - 1);
+        rand = GetRandomInt(0, numofspawns - 1);
         // get the spawn vectors and put them in our vector var
         GetArrayArray(g_hBluSpawns, rand, vectors);
     }
@@ -874,17 +869,12 @@ public Action RandomSpawn(Handle timer, any clientid)
     // test if this spawn is even remotely sane
     if (TR_PointOutsideWorld(origin))
     {
-        if (g_hFailIfInvalidSpawn)
-        {
-            SetFailState("Spawn at %.2f %.2f %.2f is outside the world! Aborting...", origin[0], origin[1], origin[2]);
-        }
-        else
-        {
-            ThrowError("Spawn at %.2f %.2f %.2f is outside the world! Aborting...", origin[0], origin[1], origin[2]);
-            // try again!
-            CreateTimer(1.0, RandomSpawn, clientid, TIMER_FLAG_NO_MAPCHANGE);
-            return Plugin_Handled;
-        }
+        LogError("Spawn at %.2f %.2f %.2f is outside the world! Aborting...", origin[0], origin[1], origin[2]);
+        // delete this spawn for this map
+        DeleteCrazySpawnThisMap(origin, team, rand);
+        // try again!
+        CreateTimer(0.1, RandomSpawn, clientid, TIMER_FLAG_NO_MAPCHANGE);
+        return Plugin_Handled;
     }
 
     // here's how players are prevented from spawning within one another.
@@ -932,7 +922,6 @@ public Action RandomSpawn(Handle timer, any clientid)
         );
     }
 
-
     // The (trace) box hit something
     if (TR_DidHit())
     {
@@ -950,18 +939,13 @@ public Action RandomSpawn(Handle timer, any clientid)
             return Plugin_Handled;
         }
         // The trace hit the world! Uh oh.
-        if (g_bFailIfInvalidSpawn)
-        {
-            SetFailState("Spawn at %.2f %.2f %.2f clips into the world - needs more space! Aborting...", origin[0], origin[1], origin[2]);
-        }
-        else
-        {
-            ThrowError("Spawn at %.2f %.2f %.2f clips into the world - needs more space! Aborting...", origin[0], origin[1], origin[2]);
+        LogError("Spawn at %.2f %.2f %.2f clips into the world - needs more space! Aborting...", origin[0], origin[1], origin[2]);
+        // delete this spawn for this map
+        DeleteCrazySpawnThisMap(origin, team, rand);
 
-            // try again!
-            CreateTimer(0.1, RandomSpawn, clientid, TIMER_FLAG_NO_MAPCHANGE);
-            return Plugin_Handled;
-        }
+        // try again!
+        CreateTimer(0.1, RandomSpawn, clientid, TIMER_FLAG_NO_MAPCHANGE);
+        return Plugin_Handled;
     }
     else
     {
@@ -986,6 +970,27 @@ public Action RandomSpawn(Handle timer, any clientid)
     }
 
     return Plugin_Continue;
+}
+
+void DeleteCrazySpawnThisMap(float origin[3], int team, int rand)
+{
+    // don't delete this spawn if we're debugging spawns
+    if (g_iDebugSpawns > 0)
+    {
+        MC_PrintToChatAll(SOAP_TAG ... "soap_debugspawns is > 0, not deleting bad spawn at index %i pos %.2f %.2f %.2f", rand, origin[0], origin[1], origin[2]);
+        return;
+    }
+
+    // we don't want to spawn here again.
+    if (team == 2)
+    {
+        RemoveFromArray(g_hRedSpawns, rand);
+    }
+    else
+    {
+        RemoveFromArray(g_hBluSpawns, rand);
+    }
+    LogMessage("Deleting bad spawn at index %i pos %.2f %.2f %.2f", rand, origin[0], origin[1], origin[2]);
 }
 
 public bool PlayerFilter(int entity, int contentsMask)
@@ -1074,14 +1079,51 @@ ShowSpawnFor(int team)
     origin[1] = vectors[1];
     origin[2] = vectors[2];
 
+    // test if this spawn is even remotely sane
+    if (TR_PointOutsideWorld(origin))
+    {
+        MC_PrintToChatAll(SOAP_TAG ... "Spawn at %.2f %.2f %.2f is COMPLETELY outside the world!", origin[0], origin[1], origin[2]);
+    }
+
     // bottom left
     float mins[3] = {-24.0, -24.0, 0.0};
     // top right
     float maxs[3] = {24.0, 24.0, 82.0};
 
+
+    // This creates a 'box' roughly the size of a player (^ where we set our mins / maxes!) at already chosen spawn point
+    TR_TraceHullFilter
+    (
+        origin,
+        origin,
+        mins,
+        maxs,
+        MASK_PLAYERSOLID,
+        PlayerFilter
+    );
+
     // blah blah fucking math shit
     AddVectors(origin, mins, mins);
     AddVectors(origin, maxs, maxs);
+
+
+    // The (trace) box hit something
+    if (TR_DidHit())
+    {
+        // ent index that it hit
+        int ent = TR_GetEntityIndex();
+
+        // The 'box' hit a player!
+        if (IsValidClient(ent))
+        {
+            //
+        }
+        // the trace hit the world!
+        else
+        {
+            MC_PrintToChatAll(SOAP_TAG ... "Spawn at %.2f %.2f %.2f clips into the world - needs more space!", origin[0], origin[1], origin[2]);
+        }
+    }
 
     // send the damn box
     TE_SendBeamBoxToAll
