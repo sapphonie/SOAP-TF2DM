@@ -317,7 +317,7 @@ public OnMapStart() {
 void InitSpawnSys()
 {
     // Spawn system written by MikeJS.
-    // note from the future - mikejs had this plugin making literally 33 copies of the spawn config file
+    // note from the future - mikejs had this plugin making literally 65 copies of each vector in the spawn config file
     // for no goddamn reason
     // it also was creating and destroying useless arrays
     // again, for no fucking reason
