@@ -2,7 +2,7 @@
 #pragma newdecls required
 
 #include <sourcemod>
-#include <color_literals>
+#include <morecolors>
 #include <sdktools>
 #include <sdkhooks>
 #include <tf2_stocks>
@@ -27,6 +27,9 @@ public Plugin myinfo =
 };
 
 // ====[ VARIABLES ]===================================================
+
+// for morecolors lol
+#define SOAP_TAG "{lime}[{cyan}SOAP{lime}]{white} "
 
 bool teamReadyState[2];
 bool dming;
@@ -120,7 +123,7 @@ void StopDeathmatching()
     Call_StartForward(g_StopDeathMatching);
     Call_Finish();
     ServerCommand("exec sourcemod/soap_live.cfg");
-    PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " " ... COLOR_GREEN ... "%t", "Plugins unloaded");
+    MC_PrintToChatAll(SOAP_TAG ... "%t", "Plugins unloaded");
     ClearArray(redPlayersReady);
     ClearArray(bluePlayersReady);
     dming = false;
@@ -135,7 +138,7 @@ void StartDeathmatching()
     Call_StartForward(g_StartDeathMatching);
     Call_Finish();
     ServerCommand("exec sourcemod/soap_notlive.cfg");
-    PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " " ... COLOR_RED ... "%t", "Plugins reloaded");
+    MC_PrintToChatAll(SOAP_TAG ... "%t", "Plugins reloaded");
     ClearArray(redPlayersReady);
     ClearArray(bluePlayersReady);
     dming = true;
