@@ -302,8 +302,9 @@ public OnMapStart() {
         if (g_bcURLSupported) {
             DownloadConfig(map, path);
         } else {
-            SetFailState("Map spawns missing. Map: %s, no cURL support", map);
+            LogMessage("Map spawns missing. Map: %s, no cURL support", map);
             LogError("File Not Found: %s, no cURL support", path);
+            SetDefaultSpawns(true, true);
         }
     }
     // End spawn system.
@@ -315,6 +316,62 @@ public OnMapStart() {
     CreateTimeCheck();
 }
 
+public SetDefaultSpawns(bool setRed, bool setBlu)
+{
+    int count[2];
+    int ent = -1;
+    float vectors[6];
+    float origin[3];
+    float angles[3];
+    
+    while ((ent = FindEntityByClassname(ent, "info_player_teamspawn")) > 0)
+    {
+            int team = GetEntProp(ent, Prop_Send, "m_iTeamNum", 1, 0);
+
+            GetEntPropVector(ent, Prop_Send, "m_vecOrigin", origin);
+            GetEntPropVector(ent, Prop_Send, "m_angRotation", angles);
+
+            vectors[0] = origin[0];
+            vectors[1] = origin[1];
+            vectors[2] = origin[2];
+            vectors[3] = angles[0];
+            vectors[4] = angles[1];
+            vectors[5] = angles[2];
+
+            // not sure what is going on with the StringToInt()/iplayers stuff below,
+            // so for now just store one copy of each spawn
+            if (team == 2 && setRed)
+            {               
+                for (new i = 0; i < MAXPLAYERS; i++)
+                {
+                    PushArrayArray(GetArrayCell(g_hRedSpawns, i), vectors);
+                }
+                count[0]++;
+            }
+            else if (team == 3 && setBlu)
+            {
+                for (new i = 0; i < MAXPLAYERS; i++)
+                {
+                    PushArrayArray(GetArrayCell(g_hBluSpawns, i), vectors);
+                }
+                count[1]++;
+            }
+    }
+
+    if (setRed)
+    {
+        LogMessage("Loaded %d default map spawns for Red.", count[0]);
+    }
+
+    if (setBlu)
+    {
+        LogMessage("Loaded %d default map spawns for Blu.", count[1]);
+    }
+
+    g_bSpawnMap = true;
+
+}
+
 public LoadMapConfig(const String:map[], const String:path[]) {
     g_bSpawnMap = true;
     FileToKeyValues(g_hKv, path);
@@ -324,6 +381,7 @@ public LoadMapConfig(const String:map[], const String:path[]) {
     float origin[3];
     float angles[3];
     new iplayers;
+    bool defaults[2] = {false, false};
 
     do {
         KvGetSectionName(g_hKv, players, sizeof(players));
@@ -350,7 +408,8 @@ public LoadMapConfig(const String:map[], const String:path[]) {
             KvGoBack(g_hKv);
             KvGoBack(g_hKv);
         } else {
-            SetFailState("Red spawns missing. Map: %s  Players: %i", map, iplayers);
+            LogMessage("Red spawns missing. Map: %s  Players: %i", map, iplayers);
+            defaults[0] = true;
         }
 
         if (KvJumpToKey(g_hKv, "blue")) {
@@ -371,9 +430,16 @@ public LoadMapConfig(const String:map[], const String:path[]) {
                 }
             } while (KvGotoNextKey(g_hKv));
         } else {
-            SetFailState("Blue spawns missing. Map: %s  Players: %i", map, iplayers);
+            LogMessage("Blue spawns missing. Map: %s  Players: %i", map, iplayers);
+            defaults[1] = true;
         }
     } while (KvGotoNextKey(g_hKv));
+
+    if (defaults[0] || defaults[1])
+    {
+        SetDefaultSpawns(defaults[0], defaults[1]);
+    }
+
 }
 
 /* OnMapEnd()
@@ -1133,12 +1199,14 @@ public Action:Event_player_spawn(Handle:event, const String:name[], bool:dontBro
     if (g_bSpawnRandom && g_bSpawnMap && (!g_bAFKSupported || !IsPlayerAFK(client))) {
         CreateTimer(0.01, RandomSpawn, clientid, TIMER_FLAG_NO_MAPCHANGE);
     } else {
+        // This shouldn't happen unless there are NO map spawns at all!
         // Play a sound anyway, because sounds are cool.
         // Don't play a sound if the player is AFK.
         if (!g_bAFKSupported || !IsPlayerAFK(client)) {
             float vecOrigin[3];
             GetClientEyePosition(client, vecOrigin);
             EmitAmbientSound("items/spawn_item.wav", vecOrigin);
+            TF2_RemoveCondition(client, TFCond_UberchargedHidden); // since RandomSpawn will never be hit, we need to remove cond here
         }
     }
 
@@ -1554,16 +1622,18 @@ OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
     if (code != CURLE_OK)
     {
         DeleteFile(targetPath);
-        SetFailState("Map spawns missing. Map: %s, failed to download config", map);
+        LogMessage("Map spawns missing. Map: %s, failed to download config", map);
         LogError("Failed to download config for: %s", map);
+        SetDefaultSpawns(true, true);
     }
     else
     {
         if (FileSize(targetPath) < 256)
         {
             DeleteFile(targetPath);
-            SetFailState("Map spawns missing. Map: %s, failed to download config", map);
+            LogMessage("Map spawns missing. Map: %s, failed to download config", map);
             LogError("Failed to download config for: %s", map);
+            SetDefaultSpawns(true, true);
             return;
         }
         else
