@@ -1443,11 +1443,12 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
 
     if (IsValidClient(attacker) && client != attacker) {
         if (g_bShowHP) {
-            if (IsPlayerAlive(attacker)) {
+            if (IsPlayerAlive(attacker))
+            {
+                MC_PrintToChat(client, SOAP_TAG ... "%t", "Health Remaining", GetClientHealth(attacker));
             }
             else
             {
-                MC_PrintToChat(client, SOAP_TAG ... "%t", "Health Remaining", GetClientHealth(attacker));
                 MC_PrintToChat(client, SOAP_TAG ... "%t", "Attacker is dead");
             }
         }
