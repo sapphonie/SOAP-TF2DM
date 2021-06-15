@@ -1,6 +1,5 @@
 #pragma semicolon 1 // Force strict semicolon mode.
-// #pragma newdecls required // use new syntax
-// newdecls can't be forced due to morecolors
+#pragma newdecls required // use new syntax
 
 // ====[ INCLUDES ]====================================================
 #include <sourcemod>
@@ -385,8 +384,6 @@ public SetDefaultSpawns(bool setRed, bool setBlu)
             vectors[4] = angles[1];
             vectors[5] = angles[2];
 
-            // not sure what is going on with the StringToInt()/iplayers stuff below,
-            // so for now just store one copy of each spawn
             if (team == 2 && setRed)
             {               
                 PushArrayArray(g_hRedSpawns, vectors);
@@ -413,7 +410,7 @@ public SetDefaultSpawns(bool setRed, bool setBlu)
 
 }
 
-public LoadMapConfig(const String map[], const String path[]) {
+public LoadMapConfig(const char[] map, const char[] path) {
     g_bSpawnMap = true;
     FileToKeyValues(g_hKv, path);
 
