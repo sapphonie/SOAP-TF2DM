@@ -13,8 +13,6 @@
 #undef REQUIRE_EXTENSIONS
 #include <cURL>
 
-//#pragma newdecls required // use new syntax
-
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
@@ -356,22 +354,70 @@ void InitSpawnSys()
         }
         else
         {
-            SetFailState("Map spawns missing. Map: %s, no cURL support", map);
+            LogMessage("Map spawns missing. Map: %s, no cURL support", map);
             LogError("File Not Found: %s, no cURL support", path);
+            SetDefaultSpawns(true, true);
         }
     }
     // End spawn system.
 }
 
-// lmfao dude kill me
-public LoadMapConfig(const char[] map, const char[] path)
+public SetDefaultSpawns(bool setRed, bool setBlu)
 {
+    int count[2];
+    int ent = -1;
+    float vectors[6];
+    float origin[3];
+    float angles[3];
+    
+    while ((ent = FindEntityByClassname(ent, "info_player_teamspawn")) > 0)
+    {
+            int team = GetEntProp(ent, Prop_Send, "m_iTeamNum", 1, 0);
+
+            GetEntPropVector(ent, Prop_Send, "m_vecOrigin", origin);
+            GetEntPropVector(ent, Prop_Send, "m_angRotation", angles);
+
+            vectors[0] = origin[0];
+            vectors[1] = origin[1];
+            vectors[2] = origin[2];
+            vectors[3] = angles[0];
+            vectors[4] = angles[1];
+            vectors[5] = angles[2];
+
+            if (team == 2 && setRed)
+            {               
+                PushArrayArray(g_hRedSpawns, vectors);
+                count[0]++;
+            }
+            else if (team == 3 && setBlu)
+            {
+                PushArrayArray(g_hBluSpawns, vectors);
+                count[1]++;
+            }
+    }
+
+    if (setRed)
+    {
+        LogMessage("Loaded %d default map spawns for Red.", count[0]);
+    }
+
+    if (setBlu)
+    {
+        LogMessage("Loaded %d default map spawns for Blu.", count[1]);
+    }
+
+    g_bSpawnMap = true;
+
+}
+
+public LoadMapConfig(const char[] map, const char[] path) {
     g_bSpawnMap = true;
     FileToKeyValues(g_hKv, path);
 
     float vectors[6];
     float origin[3];
     float angles[3];
+    bool defaults[2] = {false, false};
 
     do
     {
@@ -397,10 +443,11 @@ public LoadMapConfig(const char[] map, const char[] path)
 
             KvGoBack(g_hKv);
             KvGoBack(g_hKv);
-        }
+        } 
         else
         {
-            SetFailState("Red spawns missing. Map: %s", map);
+            LogMessage("Red spawns missing. Map: %s", map);
+            defaults[0] = true;
         }
 
         if (KvJumpToKey(g_hKv, "blue"))
@@ -424,10 +471,16 @@ public LoadMapConfig(const char[] map, const char[] path)
         }
         else
         {
-            SetFailState("Blue spawns missing. Map: %s", map);
+            LogMessage("Blue spawns missing. Map: %s", map);
+            defaults[1] = true;
         }
+    } while (KvGotoNextKey(g_hKv));
+
+    if (defaults[0] || defaults[1])
+    {
+        SetDefaultSpawns(defaults[0], defaults[1]);
     }
-    while (KvGotoNextKey(g_hKv));
+
 }
 
 /* OnMapEnd()
@@ -1564,6 +1617,7 @@ public Action Event_player_spawn(Handle event, const char[] name, bool dontBroad
             float vecOrigin[3];
             GetClientEyePosition(client, vecOrigin);
             EmitAmbientSound("items/spawn_item.wav", vecOrigin);
+            TF2_RemoveCondition(client, TFCond_UberchargedHidden); // since RandomSpawn will never be hit, we need to remove cond here
         }
     }
 
@@ -1991,16 +2045,18 @@ OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
     if (code != CURLE_OK)
     {
         DeleteFile(targetPath);
-        SetFailState("Map spawns missing. Map: %s, failed to download config", map);
+        LogMessage("Map spawns missing. Map: %s, failed to download config", map);
         LogError("Failed to download config for: %s", map);
+        SetDefaultSpawns(true, true);
     }
     else
     {
         if (FileSize(targetPath) < 256)
         {
             DeleteFile(targetPath);
-            SetFailState("Map spawns missing. Map: %s, failed to download config", map);
+            LogMessage("Map spawns missing. Map: %s, failed to download config", map);
             LogError("Failed to download config for: %s", map);
+            SetDefaultSpawns(true, true);
             return;
         }
         else
