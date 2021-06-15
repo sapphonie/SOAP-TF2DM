@@ -362,14 +362,16 @@ void InitSpawnSys()
     // End spawn system.
 }
 
-public SetDefaultSpawns(bool setRed, bool setBlu)
+void SetDefaultSpawns(bool setRed, bool setBlu)
 {
-    int count[2];
+    int redspawns;
+    int bluspawns;
     int ent = -1;
     float vectors[6];
     float origin[3];
     float angles[3];
-    
+
+    // loop thru default spawn points in the map
     while ((ent = FindEntityByClassname(ent, "info_player_teamspawn")) > 0)
     {
             int team = GetEntProp(ent, Prop_Send, "m_iTeamNum", 1, 0);
@@ -385,39 +387,40 @@ public SetDefaultSpawns(bool setRed, bool setBlu)
             vectors[5] = angles[2];
 
             if (team == 2 && setRed)
-            {               
+            {
                 PushArrayArray(g_hRedSpawns, vectors);
-                count[0]++;
+                redspawns++;
             }
             else if (team == 3 && setBlu)
             {
                 PushArrayArray(g_hBluSpawns, vectors);
-                count[1]++;
+                bluspawns++;
             }
     }
 
     if (setRed)
     {
-        LogMessage("Loaded %d default map spawns for Red.", count[0]);
+        LogMessage("Loaded %d default map spawns for Red.", redspawns);
     }
 
     if (setBlu)
     {
-        LogMessage("Loaded %d default map spawns for Blu.", count[1]);
+        LogMessage("Loaded %d default map spawns for Blu.", bluspawns);
     }
 
     g_bSpawnMap = true;
-
 }
 
-public LoadMapConfig(const char[] map, const char[] path) {
+void LoadMapConfig(const char[] map, const char[] path)
+{
     g_bSpawnMap = true;
     FileToKeyValues(g_hKv, path);
 
     float vectors[6];
     float origin[3];
     float angles[3];
-    bool defaults[2] = {false, false};
+    bool usedefaultred;
+    bool usedefaultblu;
 
     do
     {
@@ -443,11 +446,11 @@ public LoadMapConfig(const char[] map, const char[] path) {
 
             KvGoBack(g_hKv);
             KvGoBack(g_hKv);
-        } 
+        }
         else
         {
             LogMessage("Red spawns missing. Map: %s", map);
-            defaults[0] = true;
+            usedefaultred = true;
         }
 
         if (KvJumpToKey(g_hKv, "blue"))
@@ -472,25 +475,28 @@ public LoadMapConfig(const char[] map, const char[] path) {
         else
         {
             LogMessage("Blue spawns missing. Map: %s", map);
-            defaults[1] = true;
+            usedefaultblu = true;
         }
-    } while (KvGotoNextKey(g_hKv));
-
-    if (defaults[0] || defaults[1])
-    {
-        SetDefaultSpawns(defaults[0], defaults[1]);
     }
+    // ?
+    while (KvGotoNextKey(g_hKv));
 
+    if (usedefaultred || usedefaultblu)
+    {
+        SetDefaultSpawns(usedefaultred, usedefaultblu);
+    }
 }
 
 /* OnMapEnd()
  *
  * When the map ends.
  * -------------------------------------------------------------------------- */
-public OnMapEnd()
+public void OnMapEnd()
 {
     // Memory leaks: fuck 'em.
 
+
+    // TODO : deletify all of these, this is old syntax
     if (g_tCheckTimeLeft!=null) {
         KillTimer(g_tCheckTimeLeft);
         g_tCheckTimeLeft = null;
