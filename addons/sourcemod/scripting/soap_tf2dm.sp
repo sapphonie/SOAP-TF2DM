@@ -412,9 +412,8 @@ public SetDefaultSpawns(bool setRed, bool setBlu)
     g_bSpawnMap = true;
 
 }
-// lmfao dude kill me
-public LoadMapConfig(const char[] map, const char[] path)
-{
+
+public LoadMapConfig(const String map[], const String path[]) {
     g_bSpawnMap = true;
     FileToKeyValues(g_hKv, path);
 
