@@ -2,7 +2,7 @@
 #pragma newdecls required
 
 #include <sourcemod>
-#include <color_literals>
+#include <morecolors>
 #include <sdktools>
 #include <sdkhooks>
 #include <tf2_stocks>
@@ -10,7 +10,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP Tournament"
 #define PLUGIN_AUTHOR       "Lange - maintained by sappho.io"
-#define PLUGIN_VERSION      "3.8.3"
+#define PLUGIN_VERSION      "3.8.4"
 #define PLUGIN_CONTACT      "https://sappho.io"
 #define RED                 0
 #define BLU                 1
@@ -27,6 +27,9 @@ public Plugin myinfo =
 };
 
 // ====[ VARIABLES ]===================================================
+
+// for morecolors lol
+#define SOAP_TAG "{lime}[{cyan}SOAP{lime}]{white} "
 
 bool teamReadyState[2];
 bool dming;
@@ -62,7 +65,6 @@ public void OnPluginStart()
     // Win conditions met (windifference)
     HookEvent("tf_game_over", Event_GameOver);
 
-    //HookEvent("teamplay_round_restart_seconds", Event_TeamplayRestartSeconds);
     HookEvent("tournament_stateupdate", Event_TournamentStateupdate);
 
     // Hook for events when player changes their team.
@@ -73,6 +75,11 @@ public void OnPluginStart()
 
     // Listen for player readying or unreadying.
     AddCommandListener(Listener_TournamentPlayerReadystate, "tournament_player_readystate");
+
+    // maybe todo: force teamreadymode to 0 and remove the old logic as that cvar appears to be broken in tf2,
+    // causing issues where soap works perfectly fine but the announcer never starts the countdown nor does the game ever start
+    // i don't know. needs more testing.
+    // see: https://github.com/sapphonie/tf2-halftime/pull/1
 
     g_cvEnforceReadyModeCountdown = CreateConVar("soap_enforce_readymode_countdown", "1", "Set as 1 to keep mp_tournament_readymode_countdown 5 so P-Rec works properly", _, true, 0.0, true, 1.0);
     g_cvReadyModeCountdown = FindConVar("mp_tournament_readymode_countdown");
@@ -89,18 +96,19 @@ public void OnPluginStart()
     g_StopDeathMatching  = CreateGlobalForward("SOAP_StopDeathMatching", ET_Event);
     g_StartDeathMatching = CreateGlobalForward("SOAP_StartDeathMatching", ET_Event);
 
-    dming = false;
-
-    // start!
-    StartDeathmatching();
-
-    // forcibly unreadies teams on late load
-    ServerCommand("mp_tournament_restart");
+    // i don't think any of this is needed as OnPluginStart calls OnMapStart and most of it gets set there?
+    //dming = false;
+    //
+    //// start!
+    //StartDeathmatching();
+    //
+    //// forcibly unreadies teams on late load
+    //ServerCommand("mp_tournament_restart");
 }
 
 /* OnMapStart()
  *
- * When the map starts.
+ * When the map starts - also run on plugin start
  * -------------------------------------------------------------------------- */
 public void OnMapStart()
 {
@@ -108,6 +116,7 @@ public void OnMapStart()
     teamReadyState[BLU] = false;
 
     dming = false;
+    ServerCommand("mp_tournament_restart");
     StartDeathmatching();
 }
 
@@ -120,7 +129,7 @@ void StopDeathmatching()
     Call_StartForward(g_StopDeathMatching);
     Call_Finish();
     ServerCommand("exec sourcemod/soap_live.cfg");
-    PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " " ... COLOR_GREEN ... "%t", "Plugins unloaded");
+    MC_PrintToChatAll(SOAP_TAG ... "{green}%t", "Plugins unloaded");
     ClearArray(redPlayersReady);
     ClearArray(bluePlayersReady);
     dming = false;
@@ -135,7 +144,7 @@ void StartDeathmatching()
     Call_StartForward(g_StartDeathMatching);
     Call_Finish();
     ServerCommand("exec sourcemod/soap_notlive.cfg");
-    PrintColoredChatAll(COLOR_LIME ... "[" ... "\x0700FFBF" ... "SOAP" ... COLOR_LIME ... "]" ... COLOR_WHITE ... " " ... COLOR_RED ... "%t", "Plugins reloaded");
+    MC_PrintToChatAll(SOAP_TAG ... "{red}%t", "Plugins reloaded");
     ClearArray(redPlayersReady);
     ClearArray(bluePlayersReady);
     dming = true;
