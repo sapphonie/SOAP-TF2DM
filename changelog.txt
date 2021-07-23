@@ -1,3 +1,5 @@
+This file is untouched since moving to the new repository. Sorry!
+
 Version 4.0.3
 	soap_tf2dm:
 	- Bumped vers # to trigger autoupdate
