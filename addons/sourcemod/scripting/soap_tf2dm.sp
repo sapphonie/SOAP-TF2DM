@@ -9,6 +9,7 @@
 #undef REQUIRE_PLUGIN
 #include <afk>
 #include <updater>
+#include <regex>
 
 #undef REQUIRE_EXTENSIONS
 #include <cURL>
@@ -340,8 +341,8 @@ void InitSpawnSys()
     GetCurrentMap(map, sizeof(map));
 
     char path[256];
-    BuildPath(Path_SM, path, sizeof(path), "configs/soap/%s.cfg", map);
 
+    BuildPath(Path_SM, path, sizeof(path), "configs/soap/%s.cfg", map);
     if (FileExists(path))
     {
         LoadMapConfig(map, path);
@@ -355,8 +356,12 @@ void InitSpawnSys()
         else
         {
             LogMessage("Map spawns missing. Map: %s, no cURL support", map);
-            LogError("File Not Found: %s, no cURL support", path);
-            SetDefaultSpawns(true, true);
+            if (GetConfigPath(map, path, sizeof(path))) {
+                LoadMapConfig(map, path);
+            } else {
+                LogError("File Not Found: %s, no cURL support", path);
+                SetDefaultSpawns(true, true);
+            }
         }
     }
     // End spawn system.
@@ -2049,12 +2054,18 @@ OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
     CloseHandle(hDLPack);
     CloseHandle(hndl);
 
+    char path[256];
+
     if (code != CURLE_OK)
     {
         DeleteFile(targetPath);
         LogMessage("Map spawns missing. Map: %s, failed to download config", map);
         LogError("Failed to download config for: %s", map);
-        SetDefaultSpawns(true, true);
+        if (GetConfigPath(map, path, sizeof(path))) {
+            LoadMapConfig(map, path);
+        } else {
+            SetDefaultSpawns(true, true);
+        }
     }
     else
     {
@@ -2063,7 +2074,12 @@ OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
             DeleteFile(targetPath);
             LogMessage("Map spawns missing. Map: %s, failed to download config", map);
             LogError("Failed to download config for: %s", map);
-            SetDefaultSpawns(true, true);
+
+            if (GetConfigPath(map, path, sizeof(path))) {
+                LoadMapConfig(map, path);
+            } else {
+                SetDefaultSpawns(true, true);
+            }
             return;
         }
         else
@@ -2081,4 +2097,33 @@ OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
 public OnPluginEnd()
 {
     MC_PrintToChatAll(SOAP_TAG ... "Soap DM unloaded.");
+}
+
+public bool GetConfigPath(const char[] map, char[] path, int maxlength)
+{
+    LogMessage("No config for: %s, searching for fallback", map);
+    char cleanMap[64];
+    strcopy(cleanMap, sizeof(cleanMap), map);
+    Regex normalizeMapRegex = new Regex("(_(a|b|beta|u|r|v|rc|f|final|comptf|ugc)?[0-9]*[a-z]?$)|([0-9]+[a-z]?$)", 0);
+    char match[64];
+
+    normalizeMapRegex.Match(cleanMap);
+    if (normalizeMapRegex.GetSubString(0, match, sizeof(match), 0)) {
+        ReplaceString(cleanMap, sizeof(cleanMap), match, "", true);
+    }
+    LogMessage("Cleaned map %s.", cleanMap);
+
+    BuildPath(Path_SM, path, maxlength, "configs/soap");
+    DirectoryListing dh = OpenDirectory(path);
+    char file[128];
+    bool foundMatch = false;
+    while (dh.GetNext(file, sizeof(file))) {
+        if (StrContains(file, cleanMap, false) == 0) {
+            LogMessage("Found near match %s.", file);
+
+            BuildPath(Path_SM, path, maxlength, "configs/soap/%s", file);
+            foundMatch = true;
+        }
+    }
+    return foundMatch;
 }
