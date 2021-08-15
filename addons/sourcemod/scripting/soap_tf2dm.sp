@@ -107,6 +107,8 @@ int g_bAFKSupported;
 // cURL
 int g_bcURLSupported;
 
+Regex g_normalizeMapRegex;
+
 new CURL_Default_opt[][2] = {
     {_:CURLOPT_NOSIGNAL,1},
     {_:CURLOPT_NOPROGRESS,1},
@@ -253,6 +255,8 @@ public OnPluginStart()
 
     // Create configuration file in cfg/sourcemod folder
     AutoExecConfig(true, "soap_tf2dm", "sourcemod");
+
+    g_normalizeMapRegex = new Regex("(_(a|b|beta|u|r|v|rc|f|final|comptf|ugc)?[0-9]*[a-z]?$)|([0-9]+[a-z]?$)", 0);
 }
 
 public OnLibraryAdded(const String:name[]) {
@@ -2104,11 +2108,10 @@ public bool GetConfigPath(const char[] map, char[] path, int maxlength)
     LogMessage("No config for: %s, searching for fallback", map);
     char cleanMap[64];
     strcopy(cleanMap, sizeof(cleanMap), map);
-    Regex normalizeMapRegex = new Regex("(_(a|b|beta|u|r|v|rc|f|final|comptf|ugc)?[0-9]*[a-z]?$)|([0-9]+[a-z]?$)", 0);
     char match[64];
 
-    normalizeMapRegex.Match(cleanMap);
-    if (normalizeMapRegex.GetSubString(0, match, sizeof(match), 0)) {
+    g_normalizeMapRegex.Match(cleanMap);
+    if (g_normalizeMapRegex.GetSubString(0, match, sizeof(match), 0)) {
         ReplaceString(cleanMap, sizeof(cleanMap), match, "", true);
     }
     LogMessage("Cleaned map %s.", cleanMap);
@@ -2116,14 +2119,22 @@ public bool GetConfigPath(const char[] map, char[] path, int maxlength)
     BuildPath(Path_SM, path, maxlength, "configs/soap");
     DirectoryListing dh = OpenDirectory(path);
     char file[128];
+    char foundFile[128];
     bool foundMatch = false;
     while (dh.GetNext(file, sizeof(file))) {
         if (StrContains(file, cleanMap, false) == 0) {
             LogMessage("Found near match %s.", file);
+            strcopy(foundFile, sizeof(foundFile), file);
 
             BuildPath(Path_SM, path, maxlength, "configs/soap/%s", file);
             foundMatch = true;
         }
     }
+
+    if (foundMatch) {
+        MC_PrintToChatAll(SOAP_TAG ... "No configuration found for %s, loading fallback configuration from %s.", map, foundFile);
+    }
+
+
     return foundMatch;
 }
