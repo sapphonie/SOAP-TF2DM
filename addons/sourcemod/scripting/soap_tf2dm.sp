@@ -107,7 +107,10 @@ int g_bAFKSupported;
 // cURL
 int g_bcURLSupported;
 
+// Load config from other map version
 Regex g_normalizeMapRegex;
+bool g_bEnableFallbackConfig;
+Handle g_hEnableFallbackConfig;
 
 new CURL_Default_opt[][2] = {
     {_:CURLOPT_NOSIGNAL,1},
@@ -210,27 +213,29 @@ public OnPluginStart()
     g_hDisableAmmoPacks     = CreateConVar("soap_disableammopacks", "0", "Disables the ammo packs on map load.", FCVAR_NOTIFY);
     g_hNoVelocityOnSpawn    = CreateConVar("soap_novelocityonspawn", "1", "Prevents players from inheriting their velocity from previous lives when spawning thru SOAP.", FCVAR_NOTIFY);
     g_hDebugSpawns          = CreateConVar("soap_debugspawns", "0", "Set to 1 to draw boxes around spawn points when players spawn. Set to 2 to draw ALL spawn points constantly. For debugging.", FCVAR_NOTIFY, true, 0.0, true, 2.0);
+    g_hEnableFallbackConfig = CreateConVar("soap_fallback_config", "1", "Enable falling back to spawns from other versions of the map if no spawns are configured for the current map.", FCVAR_NOTIFY);
 
     // Hook convar changes and events
-    HookConVarChange(g_hRegenHP,            handler_ConVarChange);
-    HookConVarChange(g_hRegenTick,          handler_ConVarChange);
-    HookConVarChange(g_hRegenDelay,         handler_ConVarChange);
-    HookConVarChange(g_hKillStartRegen,     handler_ConVarChange);
-    HookConVarChange(g_hSpawn,              handler_ConVarChange);
-    HookConVarChange(g_hSpawnRandom,        handler_ConVarChange);
-    HookConVarChange(g_hTeamSpawnRandom,    handler_ConVarChange);
-    HookConVarChange(g_hKillHealRatio,      handler_ConVarChange);
-    HookConVarChange(g_hDamageHealRatio,    handler_ConVarChange);
-    HookConVarChange(g_hKillHealStatic,     handler_ConVarChange);
-    HookConVarChange(g_hKillAmmo,           handler_ConVarChange);
-    HookConVarChange(g_hOpenDoors,          handler_ConVarChange);
-    HookConVarChange(g_hDisableCabinet,     handler_ConVarChange);
-    HookConVarChange(g_hShowHP,             handler_ConVarChange);
-    HookConVarChange(g_hForceTimeLimit,     handler_ConVarChange);
-    HookConVarChange(g_hDisableHealthPacks, handler_ConVarChange);
-    HookConVarChange(g_hDisableAmmoPacks,   handler_ConVarChange);
-    HookConVarChange(g_hNoVelocityOnSpawn,  handler_ConVarChange);
-    HookConVarChange(g_hDebugSpawns,        handler_ConVarChange);
+    HookConVarChange(g_hRegenHP,              handler_ConVarChange);
+    HookConVarChange(g_hRegenTick,            handler_ConVarChange);
+    HookConVarChange(g_hRegenDelay,           handler_ConVarChange);
+    HookConVarChange(g_hKillStartRegen,       handler_ConVarChange);
+    HookConVarChange(g_hSpawn,                handler_ConVarChange);
+    HookConVarChange(g_hSpawnRandom,          handler_ConVarChange);
+    HookConVarChange(g_hTeamSpawnRandom,      handler_ConVarChange);
+    HookConVarChange(g_hKillHealRatio,        handler_ConVarChange);
+    HookConVarChange(g_hDamageHealRatio,      handler_ConVarChange);
+    HookConVarChange(g_hKillHealStatic,       handler_ConVarChange);
+    HookConVarChange(g_hKillAmmo,             handler_ConVarChange);
+    HookConVarChange(g_hOpenDoors,            handler_ConVarChange);
+    HookConVarChange(g_hDisableCabinet,       handler_ConVarChange);
+    HookConVarChange(g_hShowHP,               handler_ConVarChange);
+    HookConVarChange(g_hForceTimeLimit,       handler_ConVarChange);
+    HookConVarChange(g_hDisableHealthPacks,   handler_ConVarChange);
+    HookConVarChange(g_hDisableAmmoPacks,     handler_ConVarChange);
+    HookConVarChange(g_hNoVelocityOnSpawn,    handler_ConVarChange);
+    HookConVarChange(g_hDebugSpawns,          handler_ConVarChange);
+    HookConVarChange(g_hEnableFallbackConfig, handler_ConVarChange);
 
 
     HookEvent("player_death", Event_player_death);
@@ -554,6 +559,7 @@ public OnConfigsExecuted()
         delete Timer_ShowSpawns;
         Timer_ShowSpawns = CreateTimer(0.1, DebugShowSpawns, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
     }
+    g_bEnableFallbackConfig     = GetConVarBool(g_hEnableFallbackConfig);
     // reexec map config after grabbing cvars - for dm servers, to customize cvars per map etc.
     char map[64];
     GetCurrentMap(map, sizeof(map));
@@ -775,6 +781,19 @@ public handler_ConVarChange(Handle:convar, const String:oldValue[], const String
             delete Timer_ShowSpawns;
             Timer_ShowSpawns = CreateTimer(0.1, DebugShowSpawns, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
         }
+    }
+    else if (convar == g_hEnableFallbackConfig)
+    {
+        if (StringToInt(newValue) >= 1)
+        {
+            g_bEnableFallbackConfig = true;
+        }
+        else
+        {
+            g_bEnableFallbackConfig = false;
+        }
+        LogMessage("Reloading spawns.");
+        InitSpawnSys();
     }
 }
 
@@ -2105,6 +2124,9 @@ public OnPluginEnd()
 
 public bool GetConfigPath(const char[] map, char[] path, int maxlength)
 {
+    if (!g_bEnableFallbackConfig) {
+        return false;
+    }
     LogMessage("No config for: %s, searching for fallback", map);
     char cleanMap[64];
     strcopy(cleanMap, sizeof(cleanMap), map);
