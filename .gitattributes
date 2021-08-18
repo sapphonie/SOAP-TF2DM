@@ -1,1 +1,0 @@
-*.smx filter=lfs diff=lfs merge=lfs -binary
