@@ -9,6 +9,7 @@
 #undef REQUIRE_PLUGIN
 #include <afk>
 #include <updater>
+#include <regex>
 
 #undef REQUIRE_EXTENSIONS
 #include <cURL>
@@ -16,7 +17,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.2.0"
+#define PLUGIN_VERSION      "4.3.0"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -105,6 +106,11 @@ int g_bAFKSupported;
 
 // cURL
 int g_bcURLSupported;
+
+// Load config from other map version
+Regex g_normalizeMapRegex;
+bool g_bEnableFallbackConfig;
+Handle g_hEnableFallbackConfig;
 
 new CURL_Default_opt[][2] = {
     {_:CURLOPT_NOSIGNAL,1},
@@ -207,27 +213,29 @@ public OnPluginStart()
     g_hDisableAmmoPacks     = CreateConVar("soap_disableammopacks", "0", "Disables the ammo packs on map load.", FCVAR_NOTIFY);
     g_hNoVelocityOnSpawn    = CreateConVar("soap_novelocityonspawn", "1", "Prevents players from inheriting their velocity from previous lives when spawning thru SOAP.", FCVAR_NOTIFY);
     g_hDebugSpawns          = CreateConVar("soap_debugspawns", "0", "Set to 1 to draw boxes around spawn points when players spawn. Set to 2 to draw ALL spawn points constantly. For debugging.", FCVAR_NOTIFY, true, 0.0, true, 2.0);
+    g_hEnableFallbackConfig = CreateConVar("soap_fallback_config", "1", "Enable falling back to spawns from other versions of the map if no spawns are configured for the current map.", FCVAR_NOTIFY);
 
     // Hook convar changes and events
-    HookConVarChange(g_hRegenHP,            handler_ConVarChange);
-    HookConVarChange(g_hRegenTick,          handler_ConVarChange);
-    HookConVarChange(g_hRegenDelay,         handler_ConVarChange);
-    HookConVarChange(g_hKillStartRegen,     handler_ConVarChange);
-    HookConVarChange(g_hSpawn,              handler_ConVarChange);
-    HookConVarChange(g_hSpawnRandom,        handler_ConVarChange);
-    HookConVarChange(g_hTeamSpawnRandom,    handler_ConVarChange);
-    HookConVarChange(g_hKillHealRatio,      handler_ConVarChange);
-    HookConVarChange(g_hDamageHealRatio,    handler_ConVarChange);
-    HookConVarChange(g_hKillHealStatic,     handler_ConVarChange);
-    HookConVarChange(g_hKillAmmo,           handler_ConVarChange);
-    HookConVarChange(g_hOpenDoors,          handler_ConVarChange);
-    HookConVarChange(g_hDisableCabinet,     handler_ConVarChange);
-    HookConVarChange(g_hShowHP,             handler_ConVarChange);
-    HookConVarChange(g_hForceTimeLimit,     handler_ConVarChange);
-    HookConVarChange(g_hDisableHealthPacks, handler_ConVarChange);
-    HookConVarChange(g_hDisableAmmoPacks,   handler_ConVarChange);
-    HookConVarChange(g_hNoVelocityOnSpawn,  handler_ConVarChange);
-    HookConVarChange(g_hDebugSpawns,        handler_ConVarChange);
+    HookConVarChange(g_hRegenHP,              handler_ConVarChange);
+    HookConVarChange(g_hRegenTick,            handler_ConVarChange);
+    HookConVarChange(g_hRegenDelay,           handler_ConVarChange);
+    HookConVarChange(g_hKillStartRegen,       handler_ConVarChange);
+    HookConVarChange(g_hSpawn,                handler_ConVarChange);
+    HookConVarChange(g_hSpawnRandom,          handler_ConVarChange);
+    HookConVarChange(g_hTeamSpawnRandom,      handler_ConVarChange);
+    HookConVarChange(g_hKillHealRatio,        handler_ConVarChange);
+    HookConVarChange(g_hDamageHealRatio,      handler_ConVarChange);
+    HookConVarChange(g_hKillHealStatic,       handler_ConVarChange);
+    HookConVarChange(g_hKillAmmo,             handler_ConVarChange);
+    HookConVarChange(g_hOpenDoors,            handler_ConVarChange);
+    HookConVarChange(g_hDisableCabinet,       handler_ConVarChange);
+    HookConVarChange(g_hShowHP,               handler_ConVarChange);
+    HookConVarChange(g_hForceTimeLimit,       handler_ConVarChange);
+    HookConVarChange(g_hDisableHealthPacks,   handler_ConVarChange);
+    HookConVarChange(g_hDisableAmmoPacks,     handler_ConVarChange);
+    HookConVarChange(g_hNoVelocityOnSpawn,    handler_ConVarChange);
+    HookConVarChange(g_hDebugSpawns,          handler_ConVarChange);
+    HookConVarChange(g_hEnableFallbackConfig, handler_ConVarChange);
 
 
     HookEvent("player_death", Event_player_death);
@@ -252,6 +260,8 @@ public OnPluginStart()
 
     // Create configuration file in cfg/sourcemod folder
     AutoExecConfig(true, "soap_tf2dm", "sourcemod");
+
+    g_normalizeMapRegex = new Regex("(_(a|b|beta|u|r|v|rc|f|final|comptf|ugc)?[0-9]*[a-z]?$)|([0-9]+[a-z]?$)", 0);
 }
 
 public OnLibraryAdded(const String:name[]) {
@@ -340,8 +350,8 @@ void InitSpawnSys()
     GetCurrentMap(map, sizeof(map));
 
     char path[256];
-    BuildPath(Path_SM, path, sizeof(path), "configs/soap/%s.cfg", map);
 
+    BuildPath(Path_SM, path, sizeof(path), "configs/soap/%s.cfg", map);
     if (FileExists(path))
     {
         LoadMapConfig(map, path);
@@ -355,8 +365,12 @@ void InitSpawnSys()
         else
         {
             LogMessage("Map spawns missing. Map: %s, no cURL support", map);
-            LogError("File Not Found: %s, no cURL support", path);
-            SetDefaultSpawns(true, true);
+            if (GetConfigPath(map, path, sizeof(path))) {
+                LoadMapConfig(map, path);
+            } else {
+                LogError("File Not Found: %s, no cURL support", path);
+                SetDefaultSpawns(true, true);
+            }
         }
     }
     // End spawn system.
@@ -545,6 +559,7 @@ public OnConfigsExecuted()
         delete Timer_ShowSpawns;
         Timer_ShowSpawns = CreateTimer(0.1, DebugShowSpawns, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
     }
+    g_bEnableFallbackConfig     = GetConVarBool(g_hEnableFallbackConfig);
     // reexec map config after grabbing cvars - for dm servers, to customize cvars per map etc.
     char map[64];
     GetCurrentMap(map, sizeof(map));
@@ -766,6 +781,19 @@ public handler_ConVarChange(Handle:convar, const String:oldValue[], const String
             delete Timer_ShowSpawns;
             Timer_ShowSpawns = CreateTimer(0.1, DebugShowSpawns, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
         }
+    }
+    else if (convar == g_hEnableFallbackConfig)
+    {
+        if (StringToInt(newValue) >= 1)
+        {
+            g_bEnableFallbackConfig = true;
+        }
+        else
+        {
+            g_bEnableFallbackConfig = false;
+        }
+        LogMessage("Reloading spawns.");
+        InitSpawnSys();
     }
 }
 
@@ -2049,12 +2077,18 @@ OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
     CloseHandle(hDLPack);
     CloseHandle(hndl);
 
+    char path[256];
+
     if (code != CURLE_OK)
     {
         DeleteFile(targetPath);
         LogMessage("Map spawns missing. Map: %s, failed to download config", map);
         LogError("Failed to download config for: %s", map);
-        SetDefaultSpawns(true, true);
+        if (GetConfigPath(map, path, sizeof(path))) {
+            LoadMapConfig(map, path);
+        } else {
+            SetDefaultSpawns(true, true);
+        }
     }
     else
     {
@@ -2063,7 +2097,12 @@ OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
             DeleteFile(targetPath);
             LogMessage("Map spawns missing. Map: %s, failed to download config", map);
             LogError("Failed to download config for: %s", map);
-            SetDefaultSpawns(true, true);
+
+            if (GetConfigPath(map, path, sizeof(path))) {
+                LoadMapConfig(map, path);
+            } else {
+                SetDefaultSpawns(true, true);
+            }
             return;
         }
         else
@@ -2081,4 +2120,43 @@ OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
 public OnPluginEnd()
 {
     MC_PrintToChatAll(SOAP_TAG ... "Soap DM unloaded.");
+}
+
+public bool GetConfigPath(const char[] map, char[] path, int maxlength)
+{
+    if (!g_bEnableFallbackConfig) {
+        return false;
+    }
+    LogMessage("No config for: %s, searching for fallback", map);
+    char cleanMap[64];
+    strcopy(cleanMap, sizeof(cleanMap), map);
+    char match[64];
+
+    g_normalizeMapRegex.Match(cleanMap);
+    if (g_normalizeMapRegex.GetSubString(0, match, sizeof(match), 0)) {
+        ReplaceString(cleanMap, sizeof(cleanMap), match, "", true);
+    }
+    LogMessage("Cleaned map %s.", cleanMap);
+
+    BuildPath(Path_SM, path, maxlength, "configs/soap");
+    DirectoryListing dh = OpenDirectory(path);
+    char file[128];
+    char foundFile[128];
+    bool foundMatch = false;
+    while (dh.GetNext(file, sizeof(file))) {
+        if (StrContains(file, cleanMap, false) == 0) {
+            LogMessage("Found near match %s.", file);
+            strcopy(foundFile, sizeof(foundFile), file);
+
+            BuildPath(Path_SM, path, maxlength, "configs/soap/%s", file);
+            foundMatch = true;
+        }
+    }
+
+    if (foundMatch) {
+        MC_PrintToChatAll(SOAP_TAG ... "No configuration found for %s, loading fallback configuration from %s.", map, foundFile);
+    }
+
+
+    return foundMatch;
 }
