@@ -17,7 +17,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.3.0"
+#define PLUGIN_VERSION      "4.3.1"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -309,6 +309,15 @@ public OnMapStart() {
             KillTimer(g_hRegenTimer[i]);
             g_hRegenTimer[i] = null;
         }
+    }
+
+    // DON'T load on MGE
+    char map[64];
+    GetCurrentMap(map, sizeof(map));
+
+    if (StrContains(map, "mge", false) != -1)
+    {
+        SetFailState("Cowardly refusing to load SOAP DM on an MGE map.");
     }
 
     // init our spawn system
