@@ -4,10 +4,10 @@
 	{
 		"Version"
 		{
-			"Latest"	"4.3.0"
+			"Latest"	"4.3.1"
 		}
-		"Notes"		"Changes in 4.3.0:"
-		"Notes"		"- Check github!"
+		"Notes"		"Changes in 4.3.1:"
+		"Notes"		"- Make SOAP-DM compatible with MGE again."
 	}
 
 	"Files"
