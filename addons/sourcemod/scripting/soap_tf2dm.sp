@@ -357,6 +357,13 @@ void InitSpawnSys()
 
     char map[64];
     GetCurrentMap(map, sizeof(map));
+    
+    // TF2 is case-insensitive when dealing with map names
+    // We lowercase it, because the following *is* case-sensitive
+    for (int i = 0; i < sizeof(map); ++i)
+    {
+        map[i] = CharToLower(map[i]);
+    }
 
     char path[256];
 
