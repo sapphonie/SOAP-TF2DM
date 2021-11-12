@@ -12,12 +12,12 @@
 #include <regex>
 
 #undef REQUIRE_EXTENSIONS
-#include <cURL>
+#include <SteamWorks>
 
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.3.1"
+#define PLUGIN_VERSION      "4.4.0"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -105,26 +105,15 @@ Handle g_hRecentDamageTimer;
 int g_bAFKSupported;
 
 // cURL
-int g_bcURLSupported;
+int g_bCanDownload;
 
 // Load config from other map version
 Regex g_normalizeMapRegex;
 bool g_bEnableFallbackConfig;
 Handle g_hEnableFallbackConfig;
 
-new CURL_Default_opt[][2] = {
-    {_:CURLOPT_NOSIGNAL,1},
-    {_:CURLOPT_NOPROGRESS,1},
-    {_:CURLOPT_TIMEOUT,300},
-    {_:CURLOPT_CONNECTTIMEOUT,120},
-    {_:CURLOPT_USE_SSL,CURLUSESSL_TRY},
-    {_:CURLOPT_SSL_VERIFYPEER,0},
-    {_:CURLOPT_SSL_VERIFYHOST,0},
-    {_:CURLOPT_VERBOSE,0}
-};
 
 // Entities to remove - don't worry! these all get reloaded on round start!
-// https://github.com/TheAlePower/TeamFortress2/blob/1b81dded673d49adebf4d0958e52236ecc28a956/tf2_src/game/shared/teamplayroundbased_gamerules.cpp#L328-L363
 char g_entIter[][] =
 {
     "team_round_timer",                 // DISABLE      - Don't delete this ent, it will crash servers otherwise
@@ -147,12 +136,6 @@ char g_entIter[][] =
     "item_ammopack_small"               // DELETE       - ^
 };
 
-#define CURL_DEFAULT_OPT(%1) curl_easy_setopt_int_array(%1, CURL_Default_opt, sizeof(CURL_Default_opt))
-
-//void CurlSetOurOpt(Handle curl)
-//{
-//    curl_easy_setopt_int_array(curl, CURL_Default_opt, sizeof(CURL_Default_opt));
-//}
 
 // ====[ PLUGIN ]======================================================
 public Plugin myinfo = {
@@ -163,27 +146,16 @@ public Plugin myinfo = {
     url            = PLUGIN_CONTACT
 };
 
-// ====[ FUNCTIONS ]===================================================
-
-public APLRes AskPluginLoad2(Handle myself, bool late, char[] error, int err_max) {
-    MarkNativeAsOptional("curl_easy_init");
-    MarkNativeAsOptional("curl_easy_setopt_int_array");
-    MarkNativeAsOptional("curl_OpenFile");
-    MarkNativeAsOptional("curl_easy_setopt_handle");
-    MarkNativeAsOptional("curl_easy_setopt_string");
-    MarkNativeAsOptional("curl_easy_perform_thread");
-    return APLRes_Success;
-}
 
 /* OnPluginStart()
  *
  * When the plugin starts up.
  * -------------------------------------------------------------------------- */
-public OnPluginStart()
+public void OnPluginStart()
 {
     MC_PrintToChatAll(SOAP_TAG ... "Soap DM loaded.");
     g_bAFKSupported = LibraryExists("afk");
-    g_bcURLSupported = GetExtensionFileStatus("curl.ext") == 1 ? true : false;
+    g_bCanDownload  = GetExtensionFileStatus("SteamWorks.ext") == 1 ? true : false;
 
     if (LibraryExists("updater")) {
         Updater_AddPlugin(UPDATE_URL);
@@ -262,18 +234,16 @@ public OnPluginStart()
     AutoExecConfig(true, "soap_tf2dm", "sourcemod");
 
     g_normalizeMapRegex = new Regex("(_(a|b|beta|u|r|v|rc|f|final|comptf|ugc)?[0-9]*[a-z]?$)|([0-9]+[a-z]?$)", 0);
+
+    OnConfigsExecuted();
 }
 
-public OnLibraryAdded(const String:name[]) {
+public void OnLibraryAdded(const char[] name)
+{
     // Set up auto updater
     if (StrEqual(name, "afk"))
     {
         g_bAFKSupported = true;
-    }
-
-    if (StrEqual(name, "cURL"))
-    {
-        g_bcURLSupported = true;
     }
 
     if (StrEqual(name, "updater"))
@@ -282,13 +252,9 @@ public OnLibraryAdded(const String:name[]) {
     }
 }
 
-public OnLibraryRemoved(const String:name[]) {
+public void OnLibraryRemoved(const char[] name) {
     if (StrEqual(name, "afk")) {
         g_bAFKSupported = false;
-    }
-
-    if (StrEqual(name, "cURL")) {
-        g_bcURLSupported = false;
     }
 }
 
@@ -296,7 +262,7 @@ public OnLibraryRemoved(const String:name[]) {
  *
  * When the map starts.
  * -------------------------------------------------------------------------- */
-public OnMapStart() {
+public void OnMapStart() {
     // Kill everything, because fuck memory leaks.
     if (g_tCheckTimeLeft != null)
     {
@@ -304,7 +270,7 @@ public OnMapStart() {
         g_tCheckTimeLeft = null;
     }
 
-    for (new i = 0; i < MaxClients+1; i++) {
+    for (int i = 0; i < MaxClients+1; i++) {
         if (g_hRegenTimer[i]!=null) {
             KillTimer(g_hRegenTimer[i]);
             g_hRegenTimer[i] = null;
@@ -313,7 +279,7 @@ public OnMapStart() {
 
     // DON'T load on MGE
     char map[64];
-    GetCurrentMap(map, sizeof(map));
+    GetCurrentMapLowercase(map, sizeof(map));
 
     if (StrContains(map, "mge", false) != -1)
     {
@@ -333,11 +299,7 @@ public OnMapStart() {
 
 void InitSpawnSys()
 {
-    // Spawn system written by MikeJS.
-    // note from the future - mikejs had this plugin making literally 65 copies of each vector in the spawn config file
-    // for no goddamn reason
-    // it also was creating and destroying useless arrays
-    // again, for no fucking reason
+    // Spawn system written by MikeJS && wholly refactored by sappho.io
 
     // get rid of any spawns we might have
     ClearArray(g_hRedSpawns);
@@ -356,90 +318,39 @@ void InitSpawnSys()
     g_hKv = CreateKeyValues("Spawns");
 
     char map[64];
-    GetCurrentMap(map, sizeof(map));
-    
-    // TF2 is case-insensitive when dealing with map names
-    // We lowercase it, because the following *is* case-sensitive
-    for (int i = 0; i < sizeof(map); ++i)
-    {
-        map[i] = CharToLower(map[i]);
-    }
+    GetCurrentMapLowercase(map, sizeof(map));
 
     char path[256];
-
     BuildPath(Path_SM, path, sizeof(path), "configs/soap/%s.cfg", map);
+
+    // we got a local copy
     if (FileExists(path))
     {
         LoadMapConfig(map, path);
     }
+    // we don't have a local copy
     else
     {
-        if (g_bcURLSupported)
+        // we can try to download one
+        if (g_bCanDownload)
         {
-            DownloadConfig(map, path);
+            LogMessage("Map spawns missing. Map: %s. Trying to download...", map);
+            DownloadConfig();
         }
+        // we can't try to download one
         else
         {
-            LogMessage("Map spawns missing. Map: %s, no cURL support", map);
-            if (GetConfigPath(map, path, sizeof(path))) {
+            LogMessage("Map spawns missing. Map: %s. SteamWorks is not installed, we can't try to download them!", map);
+            // Try to load a fallback
+            if (GetConfigPath(map, path, sizeof(path)))
+            {
                 LoadMapConfig(map, path);
-            } else {
-                LogError("File Not Found: %s, no cURL support", path);
-                SetDefaultSpawns(true, true);
             }
         }
     }
     // End spawn system.
 }
 
-void SetDefaultSpawns(bool setRed, bool setBlu)
-{
-    int redspawns;
-    int bluspawns;
-    int ent = -1;
-    float vectors[6];
-    float origin[3];
-    float angles[3];
-
-    // loop thru default spawn points in the map
-    while ((ent = FindEntityByClassname(ent, "info_player_teamspawn")) > 0)
-    {
-            int team = GetEntProp(ent, Prop_Send, "m_iTeamNum", 1, 0);
-
-            GetEntPropVector(ent, Prop_Send, "m_vecOrigin", origin);
-            GetEntPropVector(ent, Prop_Send, "m_angRotation", angles);
-
-            vectors[0] = origin[0];
-            vectors[1] = origin[1];
-            vectors[2] = origin[2];
-            vectors[3] = angles[0];
-            vectors[4] = angles[1];
-            vectors[5] = angles[2];
-
-            if (team == 2 && setRed)
-            {
-                PushArrayArray(g_hRedSpawns, vectors);
-                redspawns++;
-            }
-            else if (team == 3 && setBlu)
-            {
-                PushArrayArray(g_hBluSpawns, vectors);
-                bluspawns++;
-            }
-    }
-
-    if (setRed)
-    {
-        LogMessage("Loaded %d default map spawns for Red.", redspawns);
-    }
-
-    if (setBlu)
-    {
-        LogMessage("Loaded %d default map spawns for Blu.", bluspawns);
-    }
-
-    g_bSpawnMap = true;
-}
 
 void LoadMapConfig(const char[] map, const char[] path)
 {
@@ -449,8 +360,6 @@ void LoadMapConfig(const char[] map, const char[] path)
     float vectors[6];
     float origin[3];
     float angles[3];
-    bool usedefaultred;
-    bool usedefaultblu;
 
     do
     {
@@ -480,7 +389,6 @@ void LoadMapConfig(const char[] map, const char[] path)
         else
         {
             LogMessage("Red spawns missing. Map: %s", map);
-            usedefaultred = true;
         }
 
         if (KvJumpToKey(g_hKv, "blue"))
@@ -505,16 +413,10 @@ void LoadMapConfig(const char[] map, const char[] path)
         else
         {
             LogMessage("Blue spawns missing. Map: %s", map);
-            usedefaultblu = true;
         }
     }
     // ?
     while (KvGotoNextKey(g_hKv));
-
-    if (usedefaultred || usedefaultblu)
-    {
-        SetDefaultSpawns(usedefaultred, usedefaultblu);
-    }
 }
 
 /* OnMapEnd()
@@ -534,7 +436,7 @@ public void OnMapEnd()
 
     delete Timer_ShowSpawns;
 
-    for (new i = 0; i < MAXPLAYERS + 1; i++) {
+    for (int i = 0; i < MAXPLAYERS + 1; i++) {
         if (g_hRegenTimer[i] != null) {
             KillTimer(g_hRegenTimer[i]);
             g_hRegenTimer[i] = null;
@@ -546,7 +448,7 @@ public void OnMapEnd()
  *
  * When game configurations (e.g., map-specific configs) are executed.
  * -------------------------------------------------------------------------- */
-public OnConfigsExecuted()
+public void OnConfigsExecuted()
 {
     // Get the values for internal global variables.
     g_iRegenHP                  = GetConVarInt(g_hRegenHP);
@@ -575,10 +477,11 @@ public OnConfigsExecuted()
         delete Timer_ShowSpawns;
         Timer_ShowSpawns = CreateTimer(0.1, DebugShowSpawns, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
     }
-    g_bEnableFallbackConfig     = GetConVarBool(g_hEnableFallbackConfig);
+    g_bEnableFallbackConfig = GetConVarBool(g_hEnableFallbackConfig);
     // reexec map config after grabbing cvars - for dm servers, to customize cvars per map etc.
     char map[64];
-    GetCurrentMap(map, sizeof(map));
+    GetCurrentMapLowercase(map, sizeof(map));
+
     ServerCommand("exec %s", map);
 }
 
@@ -587,7 +490,7 @@ public OnConfigsExecuted()
  *
  * When a client connects to the server.
  * -------------------------------------------------------------------------- */
-public OnClientConnected(client) {
+public void OnClientConnected(int client) {
     // Set the client's slot regen timer handle to null.
     if (g_hRegenTimer[client] != null) {
         KillTimer(g_hRegenTimer[client]);
@@ -606,7 +509,7 @@ public OnClientConnected(client) {
  *
  * When a client disconnects from the server.
  * -------------------------------------------------------------------------- */
-public OnClientDisconnect(client) {
+public void OnClientDisconnect(int client) {
     // Set the client's slot regen timer handle to null again because I really don't want to take any chances.
     if (g_hRegenTimer[client] != null) {
         KillTimer(g_hRegenTimer[client]);
@@ -618,7 +521,7 @@ public OnClientDisconnect(client) {
  *
  * Called when a convar's value is changed..
  * -------------------------------------------------------------------------- */
-public handler_ConVarChange(Handle:convar, const String:oldValue[], const String:newValue[]) {
+public void handler_ConVarChange(Handle convar, const char[] oldValue, const char[] newValue) {
     // When a cvar is changed during runtime, this is called and the corresponding internal variable is updated to reflect this change.
     // SourcePawn can't `switch` with Strings, so this huge if/else chain is our only option.
     if (convar == g_hRegenHP)
@@ -827,9 +730,9 @@ public handler_ConVarChange(Handle:convar, const String:oldValue[], const String
  *
  * Check map time left every 5 seconds.
  * -------------------------------------------------------------------------- */
-public Action:CheckTime(Handle:timer) {
-    new iTimeLeft;
-    new iTimeLimit;
+public Action CheckTime(Handle timer) {
+    int iTimeLeft;
+    int iTimeLimit;
     GetMapTimeLeft(iTimeLeft);
     GetMapTimeLimit(iTimeLimit);
 
@@ -849,7 +752,7 @@ public Action:CheckTime(Handle:timer) {
  *
  * Changes the map whatever sm_nextmap is.
  * -------------------------------------------------------------------------- */
-public Action:ChangeMap(Handle:timer) {
+public Action ChangeMap(Handle timer) {
     // If sm_nextmap isn't set or isn't registered, abort because there is nothing to change to.
     if (FindConVar("sm_nextmap") == null)
     {
@@ -857,14 +760,14 @@ public Action:ChangeMap(Handle:timer) {
         return;
     }
 
-    new iTimeLeft;
-    new iTimeLimit;
+    int iTimeLeft;
+    int iTimeLimit;
     GetMapTimeLeft(iTimeLeft);
     GetMapTimeLimit(iTimeLimit);
 
     // Check that soap_forcetimelimit = 1, mp_timelimit != 0, and timeleft < 0 again, because something could have changed in the last 15 seconds.
     if (g_bForceTimeLimit && iTimeLeft <= 0 &&  iTimeLimit > 0) {
-        new String:newmap[65];
+        char newmap[65];
         GetNextMap(newmap, sizeof(newmap));
         ForceChangeLevel(newmap, "Enforced Map Timelimit");
     } else {  // Turns out something did change.
@@ -880,7 +783,7 @@ public Action:ChangeMap(Handle:timer) {
  *
  * Used to create the timer that checks if the round is over.
  * -------------------------------------------------------------------------- */
-CreateTimeCheck() {
+void CreateTimeCheck() {
     if (g_tCheckTimeLeft != null) {
         KillTimer(g_tCheckTimeLeft);
         g_tCheckTimeLeft = null;
@@ -1121,7 +1024,7 @@ Action DebugShowSpawns(Handle timer)
 }
 
 // just pretend this is a for loop - we have to do this on a timer because we hit the tempent limit otherwise
-ShowSpawnFor(int team)
+void ShowSpawnFor(int team)
 {
     // lifetime for our box
     float life = 5.0;
@@ -1133,14 +1036,18 @@ ShowSpawnFor(int team)
     int numspawns;
 
     // variables per team that we iterate in our makeshift for loop
-    static red_i;
-    static blu_i;
+    static int red_i;
+    static int blu_i;
 
     // red team
     if (team == 2)
     {
         // amt of red spawns
         numspawns = GetArraySize(g_hRedSpawns);
+        if (numspawns < 1)
+        {
+            return;
+        }
         // color duh
         color = {255, 0, 0, 255};
         // reset our makeshift for loop back to 0 if we already hit the max
@@ -1159,6 +1066,10 @@ ShowSpawnFor(int team)
     {
         // amt of blue spawns
         numspawns = GetArraySize(g_hBluSpawns);
+        if (numspawns < 1)
+        {
+            return;
+        }
         // color duh
         color = {0, 0, 255, 255};
         // reset our makeshift for loop back to 0 if we already hit the max
@@ -1332,7 +1243,7 @@ public Action Respawn(Handle timer, int clientid)
  *
  * Starts regen-over-time on a player.
  * -------------------------------------------------------------------------- */
-public Action:StartRegen(Handle:timer, any:clientid) {
+public Action StartRegen(Handle timer, int clientid) {
     int client = GetClientOfUserId(clientid);
 
     if (g_hRegenTimer[client]!=null) {
@@ -1352,8 +1263,8 @@ public Action:StartRegen(Handle:timer, any:clientid) {
  *
  * Heals a player for X amount of health every Y seconds.
  * -------------------------------------------------------------------------- */
-public Action:Regen(Handle:timer, any:clientid) {
-    new client = GetClientOfUserId(clientid);
+public Action Regen(Handle timer, int clientid) {
+    int client = GetClientOfUserId(clientid);
 
     if (g_hRegenTimer[client]!=null) {
         KillTimer(g_hRegenTimer[client]);
@@ -1365,7 +1276,7 @@ public Action:Regen(Handle:timer, any:clientid) {
     }
 
     if (g_bRegen[client] && IsPlayerAlive(client)) {
-        new health = GetClientHealth(client)+g_iRegenHP;
+        int health = GetClientHealth(client)+g_iRegenHP;
 
          // If the regen would give the client more than their max hp, just set it to max.
         if (health > g_iMaxHealth[client]) {
@@ -1387,18 +1298,18 @@ public Action:Regen(Handle:timer, any:clientid) {
  * Every second push back all recent damage by 1 index.
  * This ensures we only remember the last 9-10 seconds of recent damage.
  * -------------------------------------------------------------------------- */
-public Action:Timer_RecentDamagePushback(Handle:timer, any:clientid) {
-    for (new i = 1; i <= MaxClients; i++) {
+public Action Timer_RecentDamagePushback(Handle timer, int clientid) {
+    for (int i = 1; i <= MaxClients; i++) {
         if (!IsValidClient(i)) {
             continue;
         }
 
-        for (new j = 1; j <= MaxClients; j++) {
+        for (int j = 1; j <= MaxClients; j++) {
             if (!IsValidClient(j)) {
                 continue;
             }
 
-            for (new k = RECENT_DAMAGE_SECONDS - 2; k >= 0; k--) {
+            for (int k = RECENT_DAMAGE_SECONDS - 2; k >= 0; k--) {
                 g_iRecentDamage[i][j][k+1] = g_iRecentDamage[i][j][k];
             }
 
@@ -1412,7 +1323,7 @@ public Action:Timer_RecentDamagePushback(Handle:timer, any:clientid) {
  * Starts or stops the recent damage pushback timer, based on the current value
  * of the corresponding ConVar.
  * -------------------------------------------------------------------------- */
-StartStopRecentDamagePushbackTimer()
+void StartStopRecentDamagePushbackTimer()
 {
     if (g_fDamageHealRatio > 0.0)
     {
@@ -1449,10 +1360,10 @@ StartStopRecentDamagePushbackTimer()
  * -------------------------------------------------------------------------- */
 public Action Event_player_death(Handle event, const char[] name, bool dontBroadcast)
 {
-    new client = GetClientOfUserId(GetEventInt(event, "userid"));
-    new clientid = GetClientUserId(client);
+    int client = GetClientOfUserId(GetEventInt(event, "userid"));
+    int clientid = GetClientUserId(client);
 
-    new isDeadRinger = GetEventInt(event,"death_flags") & 32;
+    int isDeadRinger = GetEventInt(event,"death_flags") & 32;
     if (!IsValidClient(client) || isDeadRinger)
     {
         return;
@@ -1460,13 +1371,13 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
 
     CreateTimer(g_fSpawn, Respawn, clientid, TIMER_FLAG_NO_MAPCHANGE);
 
-    new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
+    int attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
 
-    new weapon1 = -1;
-    new weapon2 = -1;
+    int weapon1 = -1;
+    int weapon2 = -1;
 
-    new weaponID1 = -1;
-    new weaponID2 = -1;
+    int weaponID1 = -1;
+    int weaponID2 = -1;
 
 
     if (IsValidClient(attacker) && attacker != 0)
@@ -1486,7 +1397,8 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
     }
 
     if (IsValidClient(attacker) && client != attacker) {
-        if (g_bShowHP) {
+        if (g_bShowHP)
+        {
             if (IsPlayerAlive(attacker))
             {
                 MC_PrintToChat(client, SOAP_TAG ... "%t", "Health Remaining", GetClientHealth(attacker));
@@ -1497,7 +1409,7 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
             }
         }
 
-        new targetHealth = 0;
+        int targetHealth = 0;
 
         // Heals a percentage of the killer's class' max health.
         if (g_fKillHealRatio > 0.0) {
@@ -1568,13 +1480,13 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
     if (g_fDamageHealRatio > 0.0) {
         char clientname[32];
         GetClientName(client, clientname, sizeof(clientname));
-        for (new player = 1; player <= MaxClients; player++) {
+        for (int player = 1; player <= MaxClients; player++) {
             if (!IsValidClient(player)) {
                 continue;
             }
 
-            new dmg = 0;
-            for (new i = 0; i < RECENT_DAMAGE_SECONDS; i++) {
+            int dmg = 0;
+            for (int i = 0; i < RECENT_DAMAGE_SECONDS; i++) {
                 dmg += g_iRecentDamage[client][player][i];
                 g_iRecentDamage[client][player][i] = 0;
             }
@@ -1604,11 +1516,11 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
  *
  * Called when a player is hurt.
  * -------------------------------------------------------------------------- */
-public Action:Event_player_hurt(Handle:event, const String:name[], bool:dontBroadcast) {
-    new clientid = GetEventInt(event, "userid");
-    new client = GetClientOfUserId(GetEventInt(event, "userid"));
-    new attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
-    new damage = GetEventInt(event, "damageamount");
+public Action Event_player_hurt(Handle event, const char[] name, bool dontBroadcast) {
+    int clientid = GetEventInt(event, "userid");
+    int client = GetClientOfUserId(GetEventInt(event, "userid"));
+    int attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
+    int damage = GetEventInt(event, "damageamount");
 
     if (IsValidClient(attacker) && client!=attacker) {
         g_bRegen[client] = false;
@@ -1692,7 +1604,7 @@ public Action Event_player_spawn(Handle event, const char[] name, bool dontBroad
  *
  * Called when a round starts.
  * -------------------------------------------------------------------------- */
-public Action:Event_round_start(Handle:event, const String:name[], bool:dontBroadcast) {
+public Action Event_round_start(Handle event, const char[] name, bool dontBroadcast) {
     LockMap();
 }
 
@@ -1700,12 +1612,12 @@ public Action:Event_round_start(Handle:event, const String:name[], bool:dontBroa
  *
  * Called when a player joins a team.
  * -------------------------------------------------------------------------- */
-public Action:Event_player_team(Handle:event, const String:name[], bool:dontBroadcast) {
-    new clientid = GetEventInt(event, "userid");
-    new client = GetClientOfUserId(clientid);
+public Action Event_player_team(Handle event, const char[] name, bool dontBroadcast) {
+    int clientid = GetEventInt(event, "userid");
+    int client = GetClientOfUserId(clientid);
 
-    new team = GetEventInt(event, "team");
-    new oldteam = GetEventInt(event, "oldteam");
+    int team = GetEventInt(event, "team");
+    int oldteam = GetEventInt(event, "oldteam");
 
     if (team != oldteam) {
         ResetPlayerDmgBasedRegen(client, true);
@@ -1719,7 +1631,7 @@ public Action:Event_player_team(Handle:event, const String:name[], bool:dontBroa
  * Called when the AFK state of a player has changed.
  * It is the AFK plugin that calls this method.
  * -------------------------------------------------------------------------- */
-public OnAfkStateChanged(client, bool afk)
+public int OnAfkStateChanged(int client, bool afk)
 {
     TFTeam team = TF2_GetClientTeam(client);
     if (team != TFTeam_Blue && team != TFTeam_Red)
@@ -1761,7 +1673,7 @@ public OnAfkStateChanged(client, bool afk)
  * Note that this DOES NOT fix needing to reload the map after changing the disable cabinet / health pack / ammo pack cvars
  * -------------------------------------------------------------------------- */
 
-LockMap()
+void LockMap()
 {
     DoAllEnts();
     OpenDoors();
@@ -1770,7 +1682,7 @@ LockMap()
 
 // Reload map, deleting and recreating most entities
 // written by nanochip, modified by me
-ResetMap()
+void ResetMap()
 {
     SetConVarInt(FindConVar("mp_restartgame_immediate"), 1);
     // remove waiting for players time
@@ -1799,7 +1711,7 @@ void DoAllEnts()
 }
 
 // act on the ents: requires iterator #  and entityid
-DoEnt(int i, int entity)
+void DoEnt(int i, int entity)
 {
     if (IsValidEntity(entity))
     {
@@ -1991,9 +1903,9 @@ void FixNearbyDoorRelatedThings(int ent)
  * Can respawn or reset regen-over-time on all players.
  * -------------------------------------------------------------------------- */
 void ResetPlayers() {
-    new id;
+    int id;
     if (FirstLoad == true) {
-        for (new i = 0; i < MaxClients; i++) {
+        for (int i = 0; i < MaxClients; i++) {
             if (IsValidClient(i)) {
                 id = GetClientUserId(i);
                 CreateTimer(g_fSpawn, Respawn, id, TIMER_FLAG_NO_MAPCHANGE);
@@ -2002,7 +1914,7 @@ void ResetPlayers() {
 
         FirstLoad = false;
     } else {
-        for (new i = 0; i < MaxClients; i++) {
+        for (int i = 0; i < MaxClients; i++) {
             if (IsValidClient(i)) {
                 id = GetClientUserId(i);
                 CreateTimer(0.1, StartRegen, id, TIMER_FLAG_NO_MAPCHANGE);
@@ -2010,7 +1922,7 @@ void ResetPlayers() {
         }
     }
 
-    for (new i = 1; i <= MaxClients; i++) {
+    for (int i = 1; i <= MaxClients; i++) {
         ResetPlayerDmgBasedRegen(i);
     }
 }
@@ -2019,16 +1931,16 @@ void ResetPlayers() {
  *
  * Resets the client's recent damage output to 0.
  * -------------------------------------------------------------------------- */
-ResetPlayerDmgBasedRegen(client, bool:alsoResetTaken = false) {
-    for (new player = 1; player <= MaxClients; player++) {
-        for (new i = 0; i < RECENT_DAMAGE_SECONDS; i++) {
+void ResetPlayerDmgBasedRegen(int client, bool alsoResetTaken = false) {
+    for (int player = 1; player <= MaxClients; player++) {
+        for (int i = 0; i < RECENT_DAMAGE_SECONDS; i++) {
             g_iRecentDamage[player][client][i] = 0;
         }
     }
 
     if (alsoResetTaken) {
-        for (new player = 1; player <= MaxClients; player++) {
-            for (new i = 0; i < RECENT_DAMAGE_SECONDS; i++) {
+        for (int player = 1; player <= MaxClients; player++) {
+            for (int i = 0; i < RECENT_DAMAGE_SECONDS; i++) {
                 g_iRecentDamage[client][player][i] = 0;
             }
         }
@@ -2048,7 +1960,7 @@ bool IsValidClient(int client)
  *
  * Gets the number of clients connected to the game..
  * -------------------------------------------------------------------------- */
-GetRealClientCount()
+int GetRealClientCount()
 {
     int clients = 0;
 
@@ -2063,116 +1975,118 @@ GetRealClientCount()
     return clients;
 }
 
-DownloadConfig(const char[] map, const char[] targetPath)
+void DownloadConfig()
 {
+    char map[64];
+    GetCurrentMapLowercase(map, sizeof(map));
+
     char url[256];
     Format(url, sizeof(url), "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/addons/sourcemod/configs/soap/%s.cfg", map);
 
-    Handle curl         = curl_easy_init();
-    Handle output_file  = curl_OpenFile(targetPath, "wb");
-    CURL_DEFAULT_OPT(curl);
+    LogMessage("GETing url %s", url);
 
-    Handle hDLPack = CreateDataPack();
-    WritePackCell(hDLPack, _:output_file);
-    WritePackString(hDLPack, map);
-    WritePackString(hDLPack, targetPath);
+    Handle request = SteamWorks_CreateHTTPRequest(k_EHTTPMethodGET, url);
 
-    curl_easy_setopt_handle(curl, CURLOPT_WRITEDATA, output_file);
-    curl_easy_setopt_string(curl, CURLOPT_URL, url);
-    curl_easy_perform_thread(curl, OnDownloadComplete, hDLPack);
+    SteamWorks_SetHTTPCallbacks(request, OnSteamWorksHTTPComplete);
+
+    SteamWorks_SendHTTPRequest(request);
 }
 
-OnDownloadComplete(Handle:hndl, CURLcode:code, any hDLPack) {
-    char map[128];
-    char targetPath[128];
-
-    ResetPack(hDLPack);
-    CloseHandle(Handle:ReadPackCell(hDLPack)); // output_file
-    ReadPackString(hDLPack, map, sizeof(map));
-    ReadPackString(hDLPack, targetPath, sizeof(targetPath));
-    CloseHandle(hDLPack);
-    CloseHandle(hndl);
+public void OnSteamWorksHTTPComplete(Handle hRequest, bool bFailure, bool bRequestSuccessful, EHTTPStatusCode eStatusCode)
+{
+    char map[64];
+    GetCurrentMapLowercase(map, sizeof(map));
 
     char path[256];
+    BuildPath(Path_SM, path, sizeof(path), "configs/soap/%s.cfg", map);
 
-    if (code != CURLE_OK)
+    if (bRequestSuccessful && eStatusCode == k_EHTTPStatusCode200OK)
     {
-        DeleteFile(targetPath);
-        LogMessage("Map spawns missing. Map: %s, failed to download config", map);
-        LogError("Failed to download config for: %s", map);
-        if (GetConfigPath(map, path, sizeof(path))) {
-            LoadMapConfig(map, path);
-        } else {
-            SetDefaultSpawns(true, true);
-        }
+        LogMessage("Downloaded spawn for %s!", map);
+        SteamWorks_WriteHTTPResponseBodyToFile(hRequest, path);
+        // load our map cfg
+        LoadMapConfig(map, path);
     }
     else
     {
-        if (FileSize(targetPath) < 256)
+        LogMessage("Failed to download spawns. StatusCode = %i, bFailure = %i, RequestSuccessful = %i.", eStatusCode, bFailure, bRequestSuccessful);
+        if (GetConfigPath(map, path, sizeof(path)))
         {
-            DeleteFile(targetPath);
-            LogMessage("Map spawns missing. Map: %s, failed to download config", map);
-            LogError("Failed to download config for: %s", map);
-
-            if (GetConfigPath(map, path, sizeof(path))) {
-                LoadMapConfig(map, path);
-            } else {
-                SetDefaultSpawns(true, true);
-            }
-            return;
-        }
-        else
-        {
-            MC_PrintToChatAll(SOAP_TAG ... "Successfully downloaded config %s.", map);
-            LoadMapConfig(map, targetPath);
+            LoadMapConfig(map, path);
         }
     }
+
+    CloseHandle(hRequest);
 }
 
 /* OnPluginEnd()
  *
  * When the plugin shuts down.
  * -------------------------------------------------------------------------- */
-public OnPluginEnd()
+public void OnPluginEnd()
 {
     MC_PrintToChatAll(SOAP_TAG ... "Soap DM unloaded.");
 }
 
 public bool GetConfigPath(const char[] map, char[] path, int maxlength)
 {
-    if (!g_bEnableFallbackConfig) {
+    if (!g_bEnableFallbackConfig)
+    {
         return false;
     }
-    LogMessage("No config for: %s, searching for fallback", map);
+    LogMessage("No config for: %s, searching for fallback...", map);
+
     char cleanMap[64];
     strcopy(cleanMap, sizeof(cleanMap), map);
-    char match[64];
 
-    g_normalizeMapRegex.Match(cleanMap);
-    if (g_normalizeMapRegex.GetSubString(0, match, sizeof(match), 0)) {
+    char match[64];
+    int matchnum = g_normalizeMapRegex.Match(cleanMap);
+    if (matchnum > 0 && g_normalizeMapRegex.GetSubString(0, match, sizeof(match), 0) )
+    {
         ReplaceString(cleanMap, sizeof(cleanMap), match, "", true);
+        LogMessage("Cleaned map %s.", cleanMap);
     }
-    LogMessage("Cleaned map %s.", cleanMap);
 
     BuildPath(Path_SM, path, maxlength, "configs/soap");
+    LogMessage("path %s", path);
     DirectoryListing dh = OpenDirectory(path);
     char file[128];
     char foundFile[128];
     bool foundMatch = false;
-    while (dh.GetNext(file, sizeof(file))) {
-        if (StrContains(file, cleanMap, false) == 0) {
+    while (dh.GetNext(file, sizeof(file)))
+    {
+        // match was found at the start of the string
+        if  ( StrContains(file, cleanMap, false) == 0 )
+        {
             LogMessage("Found near match %s.", file);
             strcopy(foundFile, sizeof(foundFile), file);
-
             BuildPath(Path_SM, path, maxlength, "configs/soap/%s", file);
             foundMatch = true;
         }
     }
 
-    if (foundMatch) {
+    if (foundMatch)
+    {
+        LogMessage("No configuration found for %s, loading fallback configuration from %s.", map, foundFile);
         MC_PrintToChatAll(SOAP_TAG ... "No configuration found for %s, loading fallback configuration from %s.", map, foundFile);
+        return true;
+    }
+    else
+    {
+        LogMessage("No configuration found for %s, no fallback map found. Using default spawns.", map);
+        return false;
     }
 
+}
 
-    return foundMatch;
+void GetCurrentMapLowercase(char[] map, int sizeofMap)
+{
+    GetCurrentMap(map, sizeofMap);
+
+    // TF2 is case-insensitive when dealing with map names
+    for (int i = 0; i < sizeof(sizeofMap); ++i)
+    {
+        map[i] = CharToLower(map[i]);
+    }
+
 }
