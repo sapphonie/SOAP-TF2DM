@@ -17,7 +17,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.4.0"
+#define PLUGIN_VERSION      "4.4.1"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -354,7 +354,6 @@ void InitSpawnSys()
 
 void LoadMapConfig(const char[] map, const char[] path)
 {
-    g_bSpawnMap = true;
     FileToKeyValues(g_hKv, path);
 
     float vectors[6];
@@ -380,6 +379,8 @@ void LoadMapConfig(const char[] map, const char[] path)
                 vectors[5] = angles[2];
 
                 PushArrayArray(g_hRedSpawns, vectors);
+                g_bSpawnMap = true;
+
             }
             while (KvGotoNextKey(g_hKv));
 
@@ -389,6 +390,7 @@ void LoadMapConfig(const char[] map, const char[] path)
         else
         {
             LogMessage("Red spawns missing. Map: %s", map);
+            g_bSpawnMap = false;
         }
 
         if (KvJumpToKey(g_hKv, "blue"))
@@ -407,12 +409,15 @@ void LoadMapConfig(const char[] map, const char[] path)
                 vectors[5] = angles[2];
 
                 PushArrayArray(g_hBluSpawns, vectors);
+                g_bSpawnMap = true;
+
             }
             while (KvGotoNextKey(g_hKv));
         }
         else
         {
             LogMessage("Blue spawns missing. Map: %s", map);
+            g_bSpawnMap = false;
         }
     }
     // ?
