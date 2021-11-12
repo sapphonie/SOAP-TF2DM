@@ -28,6 +28,7 @@ jobs:
       run: |
         cd ./addons/sourcemod/scripting
         pwd
+        ls -la
         spcomp -i"./include/" soap_tf2dm.sp      -o ../plugins/soap_tf2dm.smx
         spcomp -i"./include/" soap_tournament.sp -o ../plugins/soap_tournament.smx
         ls -la
