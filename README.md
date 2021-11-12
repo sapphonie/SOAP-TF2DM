@@ -6,7 +6,7 @@ For more info on SOAP DM, see [here](http://comp.tf/wiki/DM).
 
 ## Downloading
 
-- Clone the repository from [here](https://github.com/sapphonie/SOAP-TF2DM/archive/master.zip). Extract the `cfg/` and `addons/` folders from the zip to your root `/tf/` folder.
+- Get the latest version [here](https://github.com/sapphonie/SOAP-TF2DM/releases/latest). Extract the `cfg/` and `addons/` folders from the zip to your root `/tf/` folder.
 
 ## Spawn points/deathmatch not starting
 
