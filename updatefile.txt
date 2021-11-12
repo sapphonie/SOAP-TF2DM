@@ -4,7 +4,7 @@
 	{
 		"Version"
 		{
-			"Latest"	"4.4.0"
+			"Latest"	"4.4.1"
 		}
 		"Notes"		"Changes in 4.4.0:"
 		"Notes"		"- SOAP will now properly load fallback maps, and will now properly download maps from GitHub. You need to install the SteamWorks extension to use this functionality."
