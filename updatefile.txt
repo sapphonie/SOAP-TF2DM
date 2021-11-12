@@ -4,10 +4,10 @@
 	{
 		"Version"
 		{
-			"Latest"	"4.3.1"
+			"Latest"	"4.4.0"
 		}
-		"Notes"		"Changes in 4.3.1:"
-		"Notes"		"- Make SOAP-DM compatible with MGE again."
+		"Notes"		"Changes in 4.4.0:"
+		"Notes"		"- SOAP will now properly load fallback maps, and will now properly download maps from GitHub. You need to install the SteamWorks extension to use this functionality."
 	}
 
 	"Files"
@@ -24,14 +24,5 @@
 		"Plugin"	"/addons/sourcemod/translations/chi/soap_tf2dm.phrases.txt"
 		"Plugin"	"/addons/sourcemod/translations/de/soap_tf2dm.phrases.txt"
 		"Plugin"	"/addons/sourcemod/translations/ru/soap_tf2dm.phrases.txt"
-		// source files and includes
-		"Source"	"/addons/sourcemod/scripting/soap_tf2dm.sp"
-		"Source"	"/addons/sourcemod/scripting/soap_tournament.sp"
-		"Source"	"/addons/sourcemod/scripting/soap_fwd_test.sp"
-		"Source"	"/addons/sourcemod/scripting/include/afk.inc"
-		"Source"	"/addons/sourcemod/scripting/include/soap_tournament.inc"
-		"Source"	"/addons/sourcemod/scripting/include/color_literals.inc"
-		"Source"	"/addons/sourcemod/scripting/include/cURL_header.inc"
-		"Source"	"/addons/sourcemod/scripting/include/cURL.inc"
 	}
 }
