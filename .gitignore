@@ -1,8 +1,0 @@
-/addons/sourcemod/scripting/include/**
-!/addons/sourcemod/scripting/include/afk.inc
-!/addons/sourcemod/scripting/include/updater.inc
-!/addons/sourcemod/scripting/include/cURL.inc
-!/addons/sourcemod/scripting/include/cURL_header.inc
-!/addons/sourcemod/scripting/include/color_literals.inc
-!/addons/sourcemod/scripting/include/soap_tournament.inc
-spcomp.exe
