@@ -26,15 +26,16 @@ jobs:
 
     - name: Compile plugins
       run: |
-        cd ./scripting
+        cd ./addons/sourcemod/scripting
         pwd
         spcomp -i"./include/" soap_tf2dm.sp      -o ../plugins/soap_tf2dm.smx
         spcomp -i"./include/" soap_tournament.sp -o ../plugins/soap_tournament.smx
         ls -la
+        cd ../../../
     - name: Zip packages
       run: |
         mkdir build
-        7za a -r build/soap.zip scripting/ plugins/ extensions/ gamedata/ translations/
+        7za a -r build/soap.zip addons/ cfg/
         ls -la
         pwd
     - name: Set Commit Hash
