@@ -17,7 +17,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.4.1"
+#define PLUGIN_VERSION      "4.4.2"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -116,7 +116,7 @@ Handle g_hEnableFallbackConfig;
 // Entities to remove - don't worry! these all get reloaded on round start!
 char g_entIter[][] =
 {
-    "team_round_timer",                 // DISABLE      - Don't delete this ent, it will crash servers otherwise
+    "team_round_timer",                 // DISABLE*     - Don't delete this ent, it will crash servers otherwise. Don't disable on passtime maps either, for the same reason.
     "team_control_point_master",        // DISABLE      - this ent causes weird behavior in DM servers if deleted. just disable
     "team_control_point",               // DISABLE      - No need to remove this, disabling works fine
     "tf_logic_koth",                    // DISABLE      - ^
@@ -1708,7 +1708,6 @@ void DoAllEnts()
         {
             if (IsValidEntity(ent) && ent > 0)
             {
-                //LogMessage("ent %i found", ent);
                 DoEnt(i, ent);
             }
         }
@@ -1763,6 +1762,28 @@ void DoEnt(int i, int entity)
         {
             TeleportEntity(entity, view_as<float>({0.0, 0.0, -5000.0}), NULL_VECTOR, NULL_VECTOR);
         }
+        else if (StrContains(g_entIter[i], "team_round_timer", false) != -1)
+        {
+            char map[64];
+            GetCurrentMapLowercase(map, sizeof(map));
+            if (StrContains(map, "pass_", false) != -1)
+            {
+                LogMessage("Not disabling passtime team_round_timer to avoid crashes.");
+            }
+            else
+            {
+                AcceptEntityInput(entity, "Disable");
+            }
+        }
+        /* kill the pass time ball - TODO: this does nothing. why. why is passtime.
+        else if (StrContains(g_entIter[i], "info_passtime_ball_spawn", false) != -1)
+        {
+             // this doesn't stop the ball from spawning
+             AcceptEntityInput(entity, "Disable");
+             // this will crash the server
+             RemoveEntity(entity);
+        }
+        */
         // disable every other found matching ent instead of deleting, deleting certain logic/team timer ents is unneeded and can crash servers
         else
         {
