@@ -4,11 +4,12 @@
 	{
 		"Version"
 		{
-			"Latest"	"4.4.2"
+			"Latest"	"4.4.3"
 		}
 		"Notes"		"Changes in 4.4.x:"
 		"Notes"		"- SOAP will now properly load fallback maps, and will now properly download maps from GitHub. You need to install the SteamWorks extension to use this functionality."
 		"Notes"		"- SOAP no longer crashes in PASS Time."
+		"Notes"		"- SOAP will no longer endlessly cycle through maps if soap_forcetimelimit is set and the server has an STV or Replay bot enabled"
 	}
 
 	"Files"
