@@ -17,7 +17,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.4.2"
+#define PLUGIN_VERSION      "4.4.3"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -234,6 +234,8 @@ public void OnPluginStart()
     AutoExecConfig(true, "soap_tf2dm", "sourcemod");
 
     g_normalizeMapRegex = new Regex("(_(a|b|beta|u|r|v|rc|f|final|comptf|ugc)?[0-9]*[a-z]?$)|([0-9]+[a-z]?$)", 0);
+
+    GetRealClientCount();
 
     OnConfigsExecuted();
 }
@@ -1975,11 +1977,11 @@ void ResetPlayerDmgBasedRegen(int client, bool alsoResetTaken = false) {
 
 /* IsValidClient()
  *
- * Checks if a client is valid.
+ * Checks if a client is valid. Ignore replay and stv bots.
  * -------------------------------------------------------------------------- */
 bool IsValidClient(int client)
 {
-    return ((0 < client <= MaxClients) && IsClientInGame(client));
+    return ((0 < client <= MaxClients) && IsClientInGame(client) && !IsClientSourceTV(client) && !IsClientReplay(client));
 }
 
 /* GetRealClientCount()
