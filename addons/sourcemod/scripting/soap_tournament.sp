@@ -10,7 +10,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP Tournament"
 #define PLUGIN_AUTHOR       "Lange - maintained by sappho.io"
-#define PLUGIN_VERSION      "3.8.4"
+#define PLUGIN_VERSION      "3.8.5"
 #define PLUGIN_CONTACT      "https://sappho.io"
 #define RED                 0
 #define BLU                 1
@@ -48,6 +48,8 @@ ConVar g_cvEnforceReadyModeCountdown;
 public APLRes AskPluginLoad2(Handle plugin, bool late, char[] error, int err_max)
 {
     RegPluginLibrary("soap_tournament");
+
+    return APLRes_Success;
 }
 
 /* OnPluginStart()
@@ -188,6 +190,8 @@ public Action Event_PlayerTeam(Handle event, const char[] name, bool dontBroadca
     {
         RemoveFromArray(bluePlayersReady, FindValueInArray(bluePlayersReady, clientid));
     }
+
+    return Plugin_Continue;
 }
 
 public Action Event_GameOver(Handle event, const char[] name, bool dontBroadcast)
@@ -195,6 +199,8 @@ public Action Event_GameOver(Handle event, const char[] name, bool dontBroadcast
     teamReadyState[RED] = false;
     teamReadyState[BLU] = false;
     StartDeathmatching();
+
+    return Plugin_Continue;
 }
 
 public Action TournamentRestartHook(int args)
@@ -202,6 +208,8 @@ public Action TournamentRestartHook(int args)
     teamReadyState[RED] = false;
     teamReadyState[BLU] = false;
     StartDeathmatching();
+
+    return Plugin_Continue;
 }
 
 public void handler_ConVarChange(Handle convar, const char[] oldValue, const char[] newValue)
@@ -250,4 +258,6 @@ public Action Listener_TournamentPlayerReadystate(int client, const char[] comma
     {
         StopDeathmatching();
     }
+
+    return Plugin_Continue;
 }

@@ -4,20 +4,24 @@
 // ====[ INCLUDES ]====================================================
 #include <sourcemod>
 #include <sdktools>
+#include <regex>
 #include <tf2_stocks>
 #include <morecolors>
+
 #undef REQUIRE_PLUGIN
 #include <afk>
 #include <updater>
-#include <regex>
 
 #undef REQUIRE_EXTENSIONS
 #include <SteamWorks>
 
+#pragma newdecls required // use new syntax
+
+
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.4.3"
+#define PLUGIN_VERSION      "4.4.4"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -753,6 +757,7 @@ public Action CheckTime(Handle timer) {
             }
         }
     }
+    return Plugin_Continue;
 }
 
 /* ChangeMap()
@@ -764,7 +769,7 @@ public Action ChangeMap(Handle timer) {
     if (FindConVar("sm_nextmap") == null)
     {
         LogError("[SOAP] FATAL: Could not find sm_nextmap cvar. Cannot force a map change!");
-        return;
+        return Plugin_Continue;
     }
 
     int iTimeLeft;
@@ -784,6 +789,7 @@ public Action ChangeMap(Handle timer) {
             CreateTimeCheck();
         }
     }
+    return Plugin_Continue;
 }
 
 /* CreateTimeCheck()
@@ -1229,10 +1235,12 @@ public Action Respawn(Handle timer, int clientid)
 
     if (!IsValidClient(client))
     {
-        return;
+        return Plugin_Continue;
     }
 
     TF2_RespawnPlayer(client);
+
+    return Plugin_Continue;
 }
 
 /*
@@ -1259,11 +1267,13 @@ public Action StartRegen(Handle timer, int clientid) {
     }
 
     if (!IsValidClient(client)) {
-        return;
+        return Plugin_Continue;
     }
 
     g_bRegen[client] = true;
     Regen(null, clientid);
+
+    return Plugin_Continue;
 }
 
 /* Regen()
@@ -1279,7 +1289,7 @@ public Action Regen(Handle timer, int clientid) {
     }
 
     if (!IsValidClient(client)) {
-        return;
+        return Plugin_Continue;
     }
 
     if (g_bRegen[client] && IsPlayerAlive(client)) {
@@ -1298,6 +1308,8 @@ public Action Regen(Handle timer, int clientid) {
         // Call this function again in g_fRegenTick seconds.
         g_hRegenTimer[client] = CreateTimer(g_fRegenTick, Regen, clientid);
     }
+
+    return Plugin_Continue;
 }
 
 /* Timer_RecentDamagePushback()
@@ -1323,6 +1335,8 @@ public Action Timer_RecentDamagePushback(Handle timer, int clientid) {
             g_iRecentDamage[i][j][0] = 0;
         }
     }
+
+    return Plugin_Continue;
 }
 
 /* StartStopRecentDamagePushbackTimer()
@@ -1373,7 +1387,7 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
     int isDeadRinger = GetEventInt(event,"death_flags") & 32;
     if (!IsValidClient(client) || isDeadRinger)
     {
-        return;
+        return Plugin_Continue;
     }
 
     CreateTimer(g_fSpawn, Respawn, clientid, TIMER_FLAG_NO_MAPCHANGE);
@@ -1448,11 +1462,11 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
                 // Check the primary weapon, and set its ammo.
                 // make sure the weapon is actually a real one!
                 if (weapon1 == -1 || weaponID1 == -1) {
-                    return;
+                    return Plugin_Continue;
                 }
                 // Widowmaker can not be reliably resupped, and the point of the weapon is literally infinite ammo for aiming anyway. Skip it!
                 else if (weaponID1 == 527) {
-                    return;
+                    return Plugin_Continue;
                 }
                 // this fixes the cow mangler and pomson
                 else if (weaponID1 == 441 || weaponID1 == 588) {
@@ -1465,7 +1479,7 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
                 // Check the secondary weapon, and set its ammo.
                 // make sure the weapon is actually a real one!
                 if (weapon2 == -1 || weaponID2 == -1) {
-                    return;
+                    return Plugin_Continue;
                 }
                 // this fixes the bison
                 else if (weaponID2 == 442) {
@@ -1517,6 +1531,8 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
     if (g_fDamageHealRatio > 0.0) {
         ResetPlayerDmgBasedRegen(client);
     }
+
+    return Plugin_Continue;
 }
 
 /* Event_player_hurt()
@@ -1540,6 +1556,8 @@ public Action Event_player_hurt(Handle event, const char[] name, bool dontBroadc
         g_hRegenTimer[client] = CreateTimer(g_fRegenDelay, StartRegen, clientid);
         g_iRecentDamage[client][attacker][0] += damage;
     }
+
+    return Plugin_Continue;
 }
 
 /* Event_player_spawn()
@@ -1613,6 +1631,8 @@ public Action Event_player_spawn(Handle event, const char[] name, bool dontBroad
  * -------------------------------------------------------------------------- */
 public Action Event_round_start(Handle event, const char[] name, bool dontBroadcast) {
     LockMap();
+
+    return Plugin_Continue;
 }
 
 /* Event_player_team()
@@ -1638,7 +1658,7 @@ public Action Event_player_team(Handle event, const char[] name, bool dontBroadc
  * Called when the AFK state of a player has changed.
  * It is the AFK plugin that calls this method.
  * -------------------------------------------------------------------------- */
-public int OnAfkStateChanged(int client, bool afk)
+public void OnAfkStateChanged(int client, bool afk)
 {
     TFTeam team = TF2_GetClientTeam(client);
     if (team != TFTeam_Blue && team != TFTeam_Red)
