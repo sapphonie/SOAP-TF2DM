@@ -96,9 +96,9 @@ bool g_bNoVelocityOnSpawn;
 Handle g_hDebugSpawns;
 int g_iDebugSpawns;
 
-
-// i don't care
+// stuff for debug show spwns
 Handle Timer_ShowSpawns;
+int te_modelidx;
 
 // Regen damage given on kill
 #define RECENT_DAMAGE_SECONDS 10
@@ -242,6 +242,8 @@ public void OnPluginStart()
     GetRealClientCount();
 
     OnConfigsExecuted();
+
+    te_modelidx = PrecacheModel("effects/beam_generic_2.vmt", true);
 }
 
 public void OnLibraryAdded(const char[] name)
@@ -927,8 +929,8 @@ public Action RandomSpawn(Handle timer, any clientid)
         (
             mins,                                       // upper corner
             maxs,                                       // lower corner
-            PrecacheModel("sprites/laser.vmt", true),   // model index
-            PrecacheModel("sprites/laser.vmt", true),   // halo index
+            te_modelidx,                                // model index
+            te_modelidx,                                // halo index
             0,                                          // startfame
             1,                                          // framerate
             life,                                       // lifetime
@@ -1098,13 +1100,16 @@ void ShowSpawnFor(int team)
         currentlyshowingcolor--;
     }
 
-
     // Put the spawn location into origin. we don't need angles. this is a box.
     float origin[3];
+    float angles[3];
 
     origin[0] = vectors[0];
     origin[1] = vectors[1];
     origin[2] = vectors[2];
+    angles[0] = vectors[3];
+    angles[1] = vectors[4];
+    angles[2] = vectors[5];
 
     // test if this spawn is even remotely sane
     if (TR_PointOutsideWorld(origin))
@@ -1128,6 +1133,19 @@ void ShowSpawnFor(int team)
         MASK_PLAYERSOLID,
         PlayerFilter
     );
+
+    float newpos[3];
+    float angvec[3];
+
+    GetAngleVectors(angles, angvec, NULL_VECTOR, NULL_VECTOR);
+
+    // scale the angles 200 units
+    ScaleVector(angvec, 64.0);
+
+    // add em
+    AddVectors(origin, angvec, newpos);
+
+    TE_DrawLazer(origin, newpos, {255,255,1,255});
 
     // blah blah fucking math shit
     AddVectors(origin, mins, mins);
@@ -1157,15 +1175,15 @@ void ShowSpawnFor(int team)
     (
         mins,                                       // upper corner
         maxs,                                       // lower corner
-        PrecacheModel("sprites/laser.vmt", true),   // model index
-        PrecacheModel("sprites/laser.vmt", true),   // halo index
+        te_modelidx ,                               // model index
+        te_modelidx ,                               // halo index
         0,                                          // startfame
         1,                                          // framerate
         life,                                       // lifetime
         2.5,                                        // Width
         2.5,                                        // endwidth
         5,                                          // fadelength
-        1.0,                                        // amplitude
+        0.0,                                        // amplitude
         color,                                      // color
         1                                           // speed
     );
@@ -1224,6 +1242,29 @@ stock void TE_SendBeamBoxToAll(float uppercorner[3], const float bottomcorner[3]
     TE_SetupBeamPoints(tc4, tc2, ModelIndex, HaloIndex, StartFrame, FrameRate, Life, Width, EndWidth, FadeLength, Amplitude, Color, Speed);
     TE_SendToAll();
 }
+
+// set up the laser sprite
+void TE_DrawLazer(float start[3], float end[3], int color[4])
+{
+    TE_SetupBeamPoints
+    (
+        start,          // startpos
+        end,            // endpos
+        te_modelidx,    // model idx
+        te_modelidx,    // halo idx
+        0,              // startframe
+        0,              // framerate
+        5.0,            // lifetime
+        2.5,            // starting width
+        2.5,            // ending width
+        0,              // fade time duration
+        0.0,            // amplitude
+        color,          // color
+        0               // beam speed
+    );
+    TE_SendToAll();
+}
+
 
 /* Respawn()
  *
