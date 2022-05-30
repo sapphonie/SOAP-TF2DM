@@ -28,5 +28,7 @@ If a specific version of a map does not have spawn points, deathmatch mode does 
 Report other issues [here](https://github.com/sapphonie/SOAP-TF2DM/issues/new).
 
 ## What happened to the old repo?
-- The developer, [Lange](https://github.com/Lange), is undergoing serious mental health issues, which have unfortunately led him to private all of his repositories on github.com, including more popular ones, such as NodeCG, now hosted [here](https://github.com/nodecg/nodecg).
+- The developer, [Alex](https://github.com/alvancamp), privated all of their GitHub repositories a while ago, including MGE and SOAP-DM. This necessitated a new repository, aka this one.
+
+They have unprivated them, and you can find the original unmaintained version of SOAP-DM [here](https://github.com/alvancamp/SOAP-TF2DM).
 
