@@ -27,8 +27,8 @@ jobs:
     - name: Compile plugins
       run: |
         cd ./addons/sourcemod/scripting
-        spcomp -i ./include/ soap_tf2dm.sp      -o ../plugins/soap_tf2dm.smx
-        spcomp -i ./include/ soap_tournament.sp -o ../plugins/soap_tournament.smx
+        spcomp -i $includePath -i ./include/ soap_tf2dm.sp      -o ../plugins/soap_tf2dm.smx
+        spcomp -i $includePath -i ./include/ soap_tournament.sp -o ../plugins/soap_tournament.smx
         cd ../../../
     - name: Zip packages
       run: |
