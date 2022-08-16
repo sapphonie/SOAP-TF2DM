@@ -21,7 +21,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.4.4"
+#define PLUGIN_VERSION      "4.4.5"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -100,6 +100,9 @@ int g_iDebugSpawns;
 Handle Timer_ShowSpawns;
 int te_modelidx;
 
+// mp_tourney convar
+Handle mp_tournament;
+
 // Regen damage given on kill
 #define RECENT_DAMAGE_SECONDS 10
 int g_iRecentDamage[MAXPLAYERS+1][MAXPLAYERS+1][RECENT_DAMAGE_SECONDS];
@@ -128,7 +131,9 @@ char g_entIter[][] =
     "logic_relay",                      // DISABLE      - ^
     "item_teamflag",                    // DISABLE      - ^
     "trigger_capture_area",             // TELEPORT     - we tele these ents under the map by 5000 units to disable them - otherwise, huds bug out occasionally
-    "tf_logic_arena",                   // DELETE       - need to delete these, otherwise fight / spectate bullshit shows up on arena maps
+    "tf_logic_arena",                   // DELETE*      - need to delete these, otherwise fight / spectate bullshit shows up on arena maps
+                                        //                set mp_tournament to 1 to prevent this, since nuking the ents permanently breaks arena mode, for some dumb tf2 reason
+                                        //                if this is not acceptable for your use case, please open a github issue and i will address it, thank you!
     "func_regenerate",                  // DELETE       - deleting this ent is the only way to reliably prevent it from working in DM otherwise
     "func_respawnroom",                 // DELETE       - ^
     "func_respawnroomvisualizer",       // DELETE       - ^
@@ -191,6 +196,9 @@ public void OnPluginStart()
     g_hDebugSpawns          = CreateConVar("soap_debugspawns", "0", "Set to 1 to draw boxes around spawn points when players spawn. Set to 2 to draw ALL spawn points constantly. For debugging.", FCVAR_NOTIFY, true, 0.0, true, 2.0);
     g_hEnableFallbackConfig = CreateConVar("soap_fallback_config", "1", "Enable falling back to spawns from other versions of the map if no spawns are configured for the current map.", FCVAR_NOTIFY);
 
+    // for determining whether to delete arena entities or not
+    mp_tournament           = FindConVar("mp_tournament");
+
     // Hook convar changes and events
     HookConVarChange(g_hRegenHP,              handler_ConVarChange);
     HookConVarChange(g_hRegenTick,            handler_ConVarChange);
@@ -212,7 +220,6 @@ public void OnPluginStart()
     HookConVarChange(g_hNoVelocityOnSpawn,    handler_ConVarChange);
     HookConVarChange(g_hDebugSpawns,          handler_ConVarChange);
     HookConVarChange(g_hEnableFallbackConfig, handler_ConVarChange);
-
 
     HookEvent("player_death", Event_player_death);
     HookEvent("player_hurt", Event_player_hurt);
@@ -491,6 +498,7 @@ public void OnConfigsExecuted()
         Timer_ShowSpawns = CreateTimer(0.1, DebugShowSpawns, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
     }
     g_bEnableFallbackConfig = GetConVarBool(g_hEnableFallbackConfig);
+
     // reexec map config after grabbing cvars - for dm servers, to customize cvars per map etc.
     char map[64];
     GetCurrentMapLowercase(map, sizeof(map));
@@ -697,22 +705,23 @@ public void handler_ConVarChange(Handle convar, const char[] oldValue, const cha
     }
     else if (convar == g_hDebugSpawns)
     {
-        InitSpawnSys();
         if (StringToInt(newValue) <= 0)
         {
             g_iDebugSpawns = 0;
         }
         else if (StringToInt(newValue) == 1)
         {
+            LogMessage("doing debug spawns [1]");
             g_iDebugSpawns = 1;
         }
         else if (StringToInt(newValue) >= 2)
         {
             g_iDebugSpawns = 2;
-            LogMessage("doing debug spawns");
+            LogMessage("doing debug spawns [2]");
             delete Timer_ShowSpawns;
             Timer_ShowSpawns = CreateTimer(0.1, DebugShowSpawns, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
         }
+        InitSpawnSys();
     }
     else if (convar == g_hEnableFallbackConfig)
     {
@@ -1785,7 +1794,14 @@ void DoEnt(int i, int entity)
         // remove arena logic (disabling doesn't properly disable the fight / spectate bullshit)
         if (StrContains(g_entIter[i], "tf_logic_arena", false) != -1)
         {
-            RemoveEntity(entity);
+            // Why am I not following the rest of the style of the plugin and storing this in a plugin var?
+            // Because GetConVar* is literally a pointer deref and it doesn't make any difference from a performance POV.
+            // Therefore, I don't care.
+            // -sappho
+            if (!GetConVarBool(mp_tournament))
+            {
+                RemoveEntity(entity);
+            }
         }
         // if ent is a func regen AND cabinets are off, remove it. otherwise skip
         else if (StrContains(g_entIter[i], "func_regenerate", false) != -1)
@@ -1823,7 +1839,8 @@ void DoEnt(int i, int entity)
         // we don't remove / disable because both cause issues/bugs otherwise
         else if (StrContains(g_entIter[i], "trigger_capture", false) != -1)
         {
-            TeleportEntity(entity, view_as<float>({0.0, 0.0, -5000.0}), NULL_VECTOR, NULL_VECTOR);
+            float hell[3] = {0.0, 0.0, -5000.0};
+            TeleportEntity(entity, hell, NULL_VECTOR, NULL_VECTOR);
         }
         else if (StrContains(g_entIter[i], "team_round_timer", false) != -1)
         {
