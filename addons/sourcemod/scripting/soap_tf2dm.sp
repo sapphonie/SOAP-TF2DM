@@ -104,7 +104,7 @@ int te_modelidx;
 Handle mp_tournament;
 
 // Regen damage given on kill
-#define RECENT_DAMAGE_SECONDS 10
+#define RECENT_DAMAGE_SECONDS 15
 int g_iRecentDamage[MAXPLAYERS+1][MAXPLAYERS+1][RECENT_DAMAGE_SECONDS];
 Handle g_hRecentDamageTimer;
 
@@ -119,6 +119,8 @@ Regex g_normalizeMapRegex;
 bool g_bEnableFallbackConfig;
 Handle g_hEnableFallbackConfig;
 
+
+const char spawnSound = "items/spawn_item.wav";
 
 // Entities to remove - don't worry! these all get reloaded on round start!
 char g_entIter[][] =
@@ -148,7 +150,6 @@ char g_entIter[][] =
     "obj_teleporter",                   // Buildings    - Make unsolid
     "info_player_teamspawn"
 };
-
 
 // ====[ PLUGIN ]======================================================
 public Plugin myinfo = {
@@ -309,7 +310,7 @@ public void OnMapStart() {
     InitSpawnSys();
 
     // Load the sound file played when a player is spawned.
-    PrecacheSound("items/spawn_item.wav", true);
+    PrecacheSound(spawnSound, true);
 
     // Begin the time check that prevents infinite rounds on A/D and KOTH maps.
     CreateTimeCheck();
@@ -371,7 +372,7 @@ void InitSpawnSys()
 }
 
 // initalCheck being true means we're checking only if the spawn
-int  entityHit      = -1;
+int  entityHit = -1;
 bool IsPointValidForPlayer(float point[3], bool initalCheck = false, int spawningClient = -1, bool showBox = false)
 {
     if (initalCheck)
@@ -379,18 +380,20 @@ bool IsPointValidForPlayer(float point[3], bool initalCheck = false, int spawnin
         // test if this spawn is even remotely sane
         if (TR_PointOutsideWorld(point))
         {
+            MC_PrintToChatAll(SOAP_TAG ... "Spawn at %.2f %.2f %.2f is COMPLETELY outside the world!", origin[0], origin[1], origin[2]);
             LogError("Spawn at %.2f %.2f %.2f is outside the world! Aborting...", point[0], point[1], point[2]);
             return false;
         }
     }
 
 
-    // cube 256x256x256
-    if (!initalCheck)
+    // player box and then cube ( sizeOfBox x sizeOfBox x sizeOfBox )
+    if ( !initalCheck )
     {
         float mins[3] = { -24.0, -24.0, 0.0  };
         float maxs[3] = {  24.0,  24.0, 82.0 };
 
+        // Check if player is at this point
         TR_TraceHullFilter
         (
             point,
@@ -401,32 +404,57 @@ bool IsPointValidForPlayer(float point[3], bool initalCheck = false, int spawnin
             PlayerFilter
         );
 
-        // The (trace) box hit a gamer
-        if ( TR_DidHit() )
+        // debug, for visualizing
+        if ( g_iDebugSpawns > 0 )
         {
-            // ent index that it hit
-            int ent = TR_GetEntityIndex();
+            // This makes mins/maxes actually exist in the world at our chosen point instead of at origin
+            AddVectors(point, mins, mins);
+            AddVectors(point, maxs, maxs);
 
-            LogMessage("Spawn at %.2f %.2f %.2f %i hit an enemy! Aborting...", point[0], point[1], point[2], ent);
+            float life = 2.5;
+            TE_SendBeamBoxToAll
+            (
+                mins,                                       // upper corner
+                maxs,                                       // lower corner
+                te_modelidx,                                // model index
+                te_modelidx,                                // halo index
+                0,                                          // startfame
+                1,                                          // framerate
+                life,                                       // lifetime
+                5.0,                                        // Width
+                5.0,                                        // endwidth
+                5,                                          // fadelength
+                1.0,                                        // amplitude
+                {0, 255, 0, 255},                           // color ( green )
+                1                                           // speed
+            );
+        }
+
+
+        // The (trace) box hit a gamer
+        if (TR_DidHit())
+        {
+            // LogMessage("Spawn at %.2f %.2f %.2f %i hit a player! Trying another spawn...", point[0], point[1], point[2]);
             return false;
         }
 
-        // spawningClient != -1 ?
+        // Check if enemy player or enemy projectile is within sizeOfBox units cubed of this point
         const float sizeOfBox = 386.0;
         mins = { -sizeOfBox, -sizeOfBox, -sizeOfBox };
         maxs = {  sizeOfBox,  sizeOfBox,  sizeOfBox };
 
+        // This makes mins/maxes actually exist in the world at our chosen point instead of at origin
         AddVectors(point, mins, mins);
         AddVectors(point, maxs, maxs);
+
+        // I know it looks sus here passing a global variable to this function, but this is all run single threaded
+        // so it will always match with the ProjectileEnumerator function for that client
         entityHit = -1;
         TR_EnumerateEntitiesBox(mins, maxs, 0 /* don't mask any ents out */, ProjectileEnumerator, spawningClient);
 
         // debug, for visualizing
-
         if ( g_iDebugSpawns > 0 )
         {
-            // math shennanigans
-
             float life = 5.0;
             TE_SendBeamBoxToAll
             (
@@ -445,14 +473,12 @@ bool IsPointValidForPlayer(float point[3], bool initalCheck = false, int spawnin
                 1                                           // speed
             );
         }
+
         if (entityHit > 0)
         {
-            // The trace hit the world! Uh oh.
             LogMessage("Spawn at %.2f %.2f %.2f hit... something?!?! ent = %i - Aborting...", point[0], point[1], point[2], entityHit);
             return false;
         }
-
-
     }
     // size of a player
     else
@@ -466,16 +492,13 @@ bool IsPointValidForPlayer(float point[3], bool initalCheck = false, int spawnin
             point,
             mins,
             maxs,
-            MASK_PLAYERSOLID,
+            MASK_PLAYERSOLID, // solid ents only
             WorldFilter
         );
 
         // The (trace) box hit the world
-        if ( TR_DidHit() )
+        if (TR_DidHit())
         {
-            // ent index that it hit
-            int ent = TR_GetEntityIndex();
-
             // The trace hit the world! Uh oh.
             LogError("Spawn at %.2f %.2f %.2f clips into the world - needs more space! Aborting...", point[0], point[1], point[2]);
             return false;
@@ -486,24 +509,26 @@ bool IsPointValidForPlayer(float point[3], bool initalCheck = false, int spawnin
 }
 
 #include <sdkhooks>
+
 // True to continue enumerating, otherwise false.
 public bool ProjectileEnumerator(int entity, int spawningClient)
 {
-    // LogMessage("ProjectileFilter entity = %i", entity);
-
+    // World (yes, we are allowed to clip into the world) or invalid, keep looking
     if (entity == 0 || !IsValidEntity(entity))
     {
         return true;
     }
 
-
-    char classname[64];
-    if (GetEntityClassname(entity, classname, sizeof(classname)))
+    char classname[128];
+    if (!GetEntityClassname(entity, classname, sizeof(classname)))
     {
-        // LogMessage("ent %i = %s", entity, classname);
+        // Should never happen?!?
+        LogError("No classname set for entity %i!?", entity);
+        return true;
     }
 
-
+    // This checks if the player or projectile within this box is on the same team
+    // as the player we are trying to spawn here or not
     if ( StrEqual(classname, "player") || StrContains(classname, "proj_") != -1 )
     {
         TFTeam foundEntityTeam;
@@ -521,53 +546,51 @@ public bool ProjectileEnumerator(int entity, int spawningClient)
         TFTeam spawningClientTeam;
         spawningClientTeam = TF2_GetClientTeam(spawningClient);
 
+        // Same team, keep looking for more entities
         if ( foundEntityTeam == spawningClientTeam )
         {
             return true;
         }
 
-        LogMessage("team = %i", foundEntityTeam);
-        LogMessage("team = %i", spawningClientTeam);
-
-        LogMessage("ent %i = player!!!!!!!!", entity);
+        // NOT the same team, stop looking, we can't spawn here
         entityHit = entity;
         return false;
     }
 
+    // Keep looking...
     return true;
 }
 
+// True to allow ent to be hit, false otherwise
 public bool WorldFilter(int entity, int contentsMask)
 {
-    LogMessage("WorldFilter entity = %i", entity);
-
+    // world
     if (entity == 0)
     {
         return true;
     }
+    // not world
     return false;
 }
 
+// True to allow ent to be hit, false otherwise
 public bool PlayerFilter(int entity, int contentsMask, int spawningClient)
 {
-    LogMessage("EnemyPlayerFilter entity = %i", entity);
-
+    // not a player
     if (entity > MaxClients)
     {
         return false;
     }
+    // player
     else
     {
         return true;
     }
-    // if ( TF2_GetClientTeam(spawningClient) != TF2_GetClientTeam(entity) )
-    // {
-    //     return true;
-    // }
 
     return false;
 }
 
+// Some day I will rewrite this
 void LoadMapConfig(const char[] map, const char[] path)
 {
     FileToKeyValues(g_hKv, path);
@@ -587,7 +610,6 @@ void LoadMapConfig(const char[] map, const char[] path)
                 KvGetVector(g_hKv, "origin", origin);
                 if (!IsPointValidForPlayer(origin, true))
                 {
-                    LogMessage("Point not valid for player!");
                     continue;
                 }
 
@@ -599,12 +621,6 @@ void LoadMapConfig(const char[] map, const char[] path)
                 vectors[3] = angles[0];
                 vectors[4] = angles[1];
                 vectors[5] = angles[2];
-
-                int spawnpoint = CreateEntityByName("info_player_teamspawn");
-                TeleportEntity(spawnpoint, origin, angles, NULL_VECTOR);
-                // Pitch Yaw Roll (Y Z X)
-                DispatchKeyValueVector(spawnpoint, "angles", angles);
-                DispatchSpawn(spawnpoint);
 
                 PushArrayArray(g_hRedSpawns, vectors);
                 g_bSpawnMap = true;
@@ -653,7 +669,6 @@ void LoadMapConfig(const char[] map, const char[] path)
             g_bSpawnMap = false;
         }
     }
-    // ?
     while (KvGotoNextKey(g_hKv));
 }
 
@@ -664,7 +679,6 @@ void LoadMapConfig(const char[] map, const char[] path)
 public void OnMapEnd()
 {
     // Memory leaks: fuck 'em.
-
 
     // TODO : deletify all of these, this is old syntax
     if (g_tCheckTimeLeft!=null) {
@@ -1054,20 +1068,19 @@ void RandomSpawn_ReqFrame(int userid)
     RandomSpawn(null, userid);
 }
 
-public Action RandomSpawn(Handle timer, int clientid)
+public Action RandomSpawn(Handle timer, int userid)
 {
     // UserIDs are passed through timers instead of client indexes because it ensures that no mismatches can happen as UserIDs are unique.
-    int client = GetClientOfUserId(clientid);
+    int client = GetClientOfUserId(userid);
 
-    // Client wasn't valid OR isn't alive
-    if (!IsValidClient(client) ) // )|| !IsPlayerAlive(client))
+    // Client wasn't valid
+    if (!IsValidClient(client))
     {
         return Plugin_Handled;
     }
 
     // get client team
     int team = GetClientTeam(client);
-
 
     // if random team spawn is enabled...
     if (g_bTeamSpawnRandom)
@@ -1120,57 +1133,26 @@ public Action RandomSpawn(Handle timer, int clientid)
     // get rid of roll lol
     angles[2] = 0.0;
 
-
     if ( IsPointValidForPlayer(origin, false /* use 256x256 box */, client) )
     {
-        // This is really dumb.
-        DataPack spawnpoint = new DataPack();
-        WritePackCell(spawnpoint, clientid);
-        WritePackFloat(spawnpoint, origin[0]);
-        WritePackFloat(spawnpoint, origin[1]);
-        WritePackFloat(spawnpoint, origin[2]);
-        WritePackFloat(spawnpoint, angles[0]);
-        WritePackFloat(spawnpoint, angles[1]);
-        // WritePackFloat(spawnpoint, angles[2]);
-
-        // CreateTimer(0.1, ActuallySpawnPlayer, spawnpoint);
-        ActuallySpawnPlayer(spawnpoint);
+        ActuallySpawnPlayer(spawnpoint, origin, angles);
     }
     else
     {
         // Try again...
-        RequestFrame(RandomSpawn_ReqFrame, clientid);
+        RequestFrame(RandomSpawn_ReqFrame, userid);
     }
 
     return Plugin_Continue;
 }
 
-Action ActuallySpawnPlayer( DataPack spawnpoint)
+void ActuallySpawnPlayer(int client, float origin[3], float angles[3])
 {
-    LogMessage("ActuallySpawnPlayer ->");
-    ResetPack(spawnpoint);
-    int userid = ReadPackCell(spawnpoint);
-    float origin[3];
-    float angles[3];
-    origin[0] = ReadPackFloat(spawnpoint);
-    origin[1] = ReadPackFloat(spawnpoint);
-    origin[2] = ReadPackFloat(spawnpoint);
-    angles[0] = ReadPackFloat(spawnpoint);
-    angles[1] = ReadPackFloat(spawnpoint);
-    // angles[2] = ReadPackFloat(spawnpoint);
-    delete spawnpoint;
-
-    // UserIDs are passed through timers instead of client indexes because it ensures that no mismatches can happen as UserIDs are unique.
-    int client = GetClientOfUserId(userid);
-
+    // Respawn them, they will get teleported ASAP
     TF2_RespawnPlayer(client);
-    // Client wasn't valid OR isn't alive
-    if (!IsValidClient(client) )//|| !IsPlayerAlive(client))
-    {
-        return Plugin_Continue;
-    }
+
     // we didn't hit anything! let's remove that uber we set earlier...
-    // TF2_RemoveCondition(client, TFCond_UberchargedHidden);
+    TF2_RemoveCondition(client, TFCond_UberchargedHidden);
     // and actually teleport the player!
     // null their velocity so ppl don't go flying when they respawn
     if (g_bNoVelocityOnSpawn)
@@ -1182,35 +1164,11 @@ Action ActuallySpawnPlayer( DataPack spawnpoint)
     {
         TeleportEntity(client, origin, angles, NULL_VECTOR);
     }
-    // debug
-    // LogMessage("teleing %N", client);
 
     // Make a sound at the spawn point.
-    EmitAmbientSound("items/spawn_item.wav", origin);
+    EmitAmbientSound(spawnSound, origin);
 }
 
-// void DeleteCrazySpawnThisMap(float origin[3], int team, int rand)
-// {
-//     // don't delete this spawn if we're debugging spawns
-//     if (g_iDebugSpawns > 0)
-//     {
-//         MC_PrintToChatAll(SOAP_TAG ... "soap_debugspawns is > 0, not deleting bad spawn at index %i pos %.2f %.2f %.2f", rand, origin[0], origin[1], origin[2]);
-//         return;
-//     }
-// 
-//     // we don't want to spawn here again.
-//     if (team == 2)
-//     {
-//         RemoveFromArray(g_hRedSpawns, rand);
-//     }
-//     else
-//     {
-//         RemoveFromArray(g_hBluSpawns, rand);
-//     }
-//     LogMessage("Deleting bad spawn at index %i pos %.2f %.2f %.2f", rand, origin[0], origin[1], origin[2]);
-// }
-
-// blah blah
 int currentlyshowingcolor = 2;
 Action DebugShowSpawns(Handle timer)
 {
@@ -1296,63 +1254,39 @@ void ShowSpawnFor(int team)
     origin[2] = vectors[2];
     angles[0] = vectors[3];
     angles[1] = vectors[4];
-    angles[2] = vectors[5];
-
-    // test if this spawn is even remotely sane
-    // if (TR_PointOutsideWorld(origin))
-    // {
-    //     MC_PrintToChatAll(SOAP_TAG ... "Spawn at %.2f %.2f %.2f is COMPLETELY outside the world!", origin[0], origin[1], origin[2]);
-    // }
+    // no roll etc
+    angles[2] = 0.0;
 
     // bottom left
-    float mins[3] = {-24.0, -24.0, 0.0};
+    float mins[3] = { -24.0, -24.0, 0.0  };
     // top right
-    float maxs[3] = {24.0, 24.0, 82.0};
+    float maxs[3] = {  24.0,  24.0, 82.0 };
 
-
-    // This creates a 'box' roughly the size of a player (^ where we set our mins / maxes!) at already chosen spawn point
-    // TR_TraceHullFilter
-    // (
-    //     origin,
-    //     origin,
-    //     mins,
-    //     maxs,
-    //     MASK_PLAYERSOLID,
-    //     PlayerFilter
-    // );
-
+    // This is so we can draw a yellow line that indicates where the client will face when they spawn
     float newpos[3];
     float angvec[3];
-
     GetAngleVectors(angles, angvec, NULL_VECTOR, NULL_VECTOR);
 
-    // scale the angles 200 units
+    // scale the angles 64 units in front of us
     ScaleVector(angvec, 64.0);
 
     // add em
     AddVectors(origin, angvec, newpos);
 
+    // draw it
     TE_DrawLazer(origin, newpos, {255,255,1,255});
 
-    // blah blah fucking math shit
+    // draw spawn in the world instead of around the origin
     AddVectors(origin, mins, mins);
     AddVectors(origin, maxs, maxs);
-
-
-
-    // The (trace) box hit the world...
-    if ( !IsPointValidForPlayer(origin, true) )
-    {
-        MC_PrintToChatAll(SOAP_TAG ... "Spawn at %.2f %.2f %.2f clips into the world - needs more space!", origin[0], origin[1], origin[2]);
-    }
 
     // send the damn box
     TE_SendBeamBoxToAll
     (
         mins,                                       // upper corner
         maxs,                                       // lower corner
-        te_modelidx ,                               // model index
-        te_modelidx ,                               // halo index
+        te_modelidx,                                // model index
+        te_modelidx,                                // halo index
         0,                                          // startfame
         1,                                          // framerate
         life,                                       // lifetime
@@ -1476,10 +1410,11 @@ public Action Respawn(Handle timer, int clientid)
         if (!g_bAFKSupported || !IsPlayerAFK(client))
         {
             TF2_RespawnPlayer(client);
-            float vecOrigin[3];
-            GetClientEyePosition(client, vecOrigin);
-            EmitAmbientSound("items/spawn_item.wav", vecOrigin);
-            TF2_RemoveCondition(client, TFCond_UberchargedHidden); // since RandomSpawn will never be hit, we need to remove cond here
+            float origin[3];
+            GetClientEyePosition(client, origin);
+            EmitAmbientSound(spawnSound, origin);
+            // This should never happen but do it anyway
+            TF2_RemoveCondition(client, TFCond_UberchargedHidden);
         }
     }
 
@@ -1501,8 +1436,8 @@ public Action Respawn(Handle timer, int clientid)
  *
  * Starts regen-over-time on a player.
  * -------------------------------------------------------------------------- */
-public Action StartRegen(Handle timer, int clientid) {
-    int client = GetClientOfUserId(clientid);
+public Action StartRegen(Handle timer, int userid) {
+    int client = GetClientOfUserId(userid);
 
     if (g_hRegenTimer[client]!=null) {
         KillTimer(g_hRegenTimer[client]);
@@ -1514,7 +1449,7 @@ public Action StartRegen(Handle timer, int clientid) {
     }
 
     g_bRegen[client] = true;
-    Regen(null, clientid);
+    Regen(null, userid);
 
     return Plugin_Continue;
 }
