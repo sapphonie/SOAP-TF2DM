@@ -7,6 +7,8 @@
 #include <regex>
 #include <tf2_stocks>
 #include <morecolors>
+#include <sdkhooks>
+#include <dhooks>
 
 #undef REQUIRE_PLUGIN
 #include <afk>
@@ -21,7 +23,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.4.6"
+#define PLUGIN_VERSION      "4.5.0"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -121,6 +123,15 @@ Handle g_hEnableFallbackConfig;
 
 
 char spawnSound[24] = "items/spawn_item.wav";
+
+Handle soap_gamedata;
+Handle SDKCall_GetBaseEntity;
+
+
+// for determining if we should let a client spawn or not
+bool dontSpawnClient[MAXPLAYERS+1];
+
+
 
 // Entities to remove - don't worry! these all get reloaded on round start!
 char g_entIter[][] =
@@ -222,11 +233,12 @@ public void OnPluginStart()
     HookConVarChange(g_hDebugSpawns,          handler_ConVarChange);
     HookConVarChange(g_hEnableFallbackConfig, handler_ConVarChange);
 
-    HookEvent("player_death", Event_player_death);
-    HookEvent("player_hurt", Event_player_hurt);
-    HookEvent("player_spawn", Event_player_spawn, EventHookMode_Pre );
-    HookEvent("player_team", Event_player_team);
-    HookEvent("teamplay_round_start", Event_round_start);
+    HookEvent("player_death",           Event_player_death, EventHookMode_Pre);
+    HookEvent("player_hurt",            Event_player_hurt);
+    HookEvent("player_spawn",           Event_player_spawn, EventHookMode_Pre);
+    HookEvent("player_team",            Event_player_team,  EventHookMode_Pre);
+    HookEvent("player_changeclass",     Event_player_class, EventHookMode_Pre);
+    HookEvent("teamplay_round_start",   Event_round_start);
     HookEvent("teamplay_restart_round", Event_round_start);
 
     // Create arrays for the spawning system
@@ -252,6 +264,87 @@ public void OnPluginStart()
     OnConfigsExecuted();
 
     te_modelidx = PrecacheModel("effects/beam_generic_2.vmt", true);
+
+    // SetConVarBool(FindConVar("mp_disable_respawn_times"), false);
+
+
+    // GAMEDATA
+    soap_gamedata = LoadGameConfigFile("soap");
+    if (!soap_gamedata)
+    {
+        SetFailState("Couldn't load SOAP DM gamedata!");
+    }
+
+    // For preventing clients from respawning when they're not supposed to
+    Handle CTFPlayer__ForceRespawn = DHookCreateFromConf(soap_gamedata, "CTFPlayer::ForceRespawn");
+    if (!CTFPlayer__ForceRespawn)
+    {
+        SetFailState("Failed to setup detour for CTFPlayer::ForceRespawn");
+    }
+
+    if (!DHookEnableDetour(CTFPlayer__ForceRespawn, false, Detour_CTFPlayer__ForceRespawn))
+    {
+        SetFailState("Failed to detour CTFPlayer::ForceRespawn");
+    }
+    PrintToServer("-> Detoured CTFPlayer::ForceRespawn");
+
+    // For getting the entity index of a client from a pointer
+    StartPrepSDKCall(SDKCall_Raw);
+    PrepSDKCall_SetFromConf(soap_gamedata, SDKConf_Virtual, "CBaseEntity::GetBaseEntity");
+    PrepSDKCall_SetReturnInfo(SDKType_CBaseEntity, SDKPass_Pointer);
+    SDKCall_GetBaseEntity = EndPrepSDKCall();
+    if (!SDKCall_GetBaseEntity)
+    {
+        SetFailState("Couldn't set up CBaseEntity::GetBaseEntity SDKCall");
+    }
+    PrintToServer("-> Detoured CTFPlayer::ForceRespawn");
+}
+
+// This is run on map start since the gamerules ent will get wiped and respawned on map changes
+void doGameRulesDetour()
+{
+    // For forcing the round state to be "running" and not preround or anything else dumb
+    Handle CTFGameRules__Think = DHookCreateFromConf(soap_gamedata, "CTFGameRules::Think");
+    if (!CTFGameRules__Think)
+    {
+        SetFailState("Failed to setup detour for CTFGameRules::Think");
+    }
+
+    if (!DHookEnableDetour(CTFGameRules__Think, false, Detour_CTFGameRules__Think))
+    {
+        SetFailState("Failed to detour CTFGameRules::Think.");
+    }
+
+    PrintToServer("-> Detoured CTFGameRules::Think");
+}
+
+MRESReturn Detour_CTFGameRules__Think(int pThis)
+{
+    // RoundState rs = GameRules_GetRoundState();
+    // LogMessage("-> !!!!!Detour_CTFGameRules__Think!!!!!!!! %i", rs);
+    GameRules_SetProp("m_iRoundState", RoundState_RoundRunning);
+    return MRES_Ignored;
+}
+
+public MRESReturn Detour_CTFPlayer__ForceRespawn(Address pThis)
+{
+    // I don't know why this would ever happen but just in case
+    if (!pThis)
+    {
+        return MRES_Ignored;
+    }
+
+    // LogMessage("-> !!!!!Detour_CTFPlayer__ForceRespawn!!!!!!!!");
+    // LogMessage("ent = %x", pThis);
+
+    int client = SDKCall(SDKCall_GetBaseEntity, pThis);
+
+    if (dontSpawnClient[client])
+    {
+        return MRES_Supercede;
+    }
+
+    return MRES_Ignored;
 }
 
 public void OnLibraryAdded(const char[] name)
@@ -310,8 +403,10 @@ public void OnMapStart() {
 
     // Begin the time check that prevents infinite rounds on A/D and KOTH maps.
     CreateTimeCheck();
-}
 
+
+    doGameRulesDetour();
+}
 
 void InitSpawnSys()
 {
@@ -527,23 +622,23 @@ public bool ProjectileEnumerator(int entity, int spawningClient)
     // as the player we are trying to spawn here or not
     if (StrEqual(classname, "player") || StrContains(classname, "proj_") != -1)
     {
-        TFTeam foundEntityTeam;
+        int foundEntityTeam;
         // player
         if (entity <= MaxClients)
         {
-            foundEntityTeam = TF2_GetClientTeam(entity);
+            foundEntityTeam = GetClientTeam(entity);
         }
         // projectile
         else
         {
-            foundEntityTeam = view_as<TFTeam>(GetEntProp(entity, Prop_Send, "m_iTeamNum"));
+            foundEntityTeam = GetEntProp(entity, Prop_Send, "m_iTeamNum");
         }
 
-        TFTeam spawningClientTeam;
-        spawningClientTeam = TF2_GetClientTeam(spawningClient);
+        int spawningClientTeam;
+        spawningClientTeam = GetClientTeam(spawningClient);
 
         // Same team, keep looking for more entities
-        if ( foundEntityTeam == spawningClientTeam )
+        if (foundEntityTeam == spawningClientTeam)
         {
             return true;
         }
@@ -1142,6 +1237,7 @@ public Action RandomSpawn(Handle timer, int userid)
 
 void ActuallySpawnPlayer(int client, float origin[3], float angles[3])
 {
+    dontSpawnClient[client] = false;
     // Respawn them, they will get teleported ASAP
     TF2_RespawnPlayer(client);
 
@@ -1383,6 +1479,12 @@ public Action Respawn(Handle timer, int clientid)
         return Plugin_Continue;
     }
 
+    TFTeam team = TF2_GetClientTeam(client);
+    if (team != TFTeam_Blue && team != TFTeam_Red)
+    {
+        return Plugin_Continue;
+    }
+
     // Are random spawns on and does this map have spawns?
     if
     (
@@ -1536,7 +1638,6 @@ void StartStopRecentDamagePushbackTimer()
     }
 }
 
-
 /*
  * ------------------------------------------------------------------
  *      ______                  __
@@ -1557,8 +1658,8 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
     int client = GetClientOfUserId(GetEventInt(event, "userid"));
     int clientid = GetClientUserId(client);
 
-    int isDeadRinger = GetEventInt(event,"death_flags") & 32;
-    if (!IsValidClient(client) || isDeadRinger)
+    int isDeadRinger    = GetEventInt(event,"death_flags") & 32;
+    if ( !IsValidClient(client) || isDeadRinger )
     {
         return Plugin_Continue;
     }
@@ -1740,7 +1841,6 @@ public Action Event_player_spawn(Handle event, const char[] name, bool dontBroad
     int client      = GetClientOfUserId(GetEventInt(event, "userid"));
     int clientid    = GetClientUserId(client);
 
-
     // No sentries!
     int flags   = GetEntityFlags(client);
     flags      |= FL_NOTARGET;
@@ -1759,7 +1859,6 @@ public Action Event_player_spawn(Handle event, const char[] name, bool dontBroad
     {
         return Plugin_Continue;
     }
-
 
     // Get the player's max health and store it in a global variable. Doing it this way is handy for things like the Gunslinger and Eyelander, which change max health.
     g_iMaxHealth[client] = GetClientHealth(client);
@@ -1791,16 +1890,41 @@ public Action Event_round_start(Handle event, const char[] name, bool dontBroadc
  *
  * Called when a player joins a team.
  * -------------------------------------------------------------------------- */
-public Action Event_player_team(Handle event, const char[] name, bool dontBroadcast) {
+public Action Event_player_team(Handle event, const char[] name, bool dontBroadcast)
+{
     int clientid    = GetEventInt(event, "userid");
     int client      = GetClientOfUserId(clientid);
 
     int team        = GetEventInt(event, "team");
     int oldteam     = GetEventInt(event, "oldteam");
 
-    if (team != oldteam) {
+    dontSpawnClient[client] = true;
+
+    if ( team != oldteam )
+    {
+        LogMessage("player team ->");
         ResetPlayerDmgBasedRegen(client, true);
+        // spec / unassigned
+        if (oldteam == 0 || oldteam == 1)
+        {
+            CreateTimer(g_fSpawn, Respawn, clientid);
+        }
     }
+
+    return Plugin_Continue;
+}
+
+
+/* Event_player_class()
+ *
+ * Called when a player requests to change their class.
+ * -------------------------------------------------------------------------- */
+public Action Event_player_class(Handle event, const char[] name, bool dontBroadcast) {
+
+    int clientid    = GetEventInt(event, "userid");
+    int client      = GetClientOfUserId(clientid);
+
+    dontSpawnClient[client] = true;
 
     return Plugin_Continue;
 }
