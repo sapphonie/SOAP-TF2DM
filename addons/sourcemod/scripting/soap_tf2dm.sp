@@ -145,10 +145,6 @@ char g_entIter[][] =
     "item_ammopack_full",               // DELETE       - ^
     "item_ammopack_medium",             // DELETE       - ^
     "item_ammopack_small",              // DELETE       - ^
-    "obj_sentrygun",                    // Buildings    - Make unsolid
-    "obj_dispenser",                    // Buildings    - Make unsolid
-    "obj_teleporter",                   // Buildings    - Make unsolid
-    "info_player_teamspawn"
 };
 
 // ====[ PLUGIN ]======================================================
@@ -388,7 +384,7 @@ bool IsPointValidForPlayer(float point[3], bool initalCheck = false, int spawnin
 
 
     // player box and then cube ( sizeOfBox x sizeOfBox x sizeOfBox )
-    if ( !initalCheck )
+    if (!initalCheck)
     {
         float mins[3] = { -24.0, -24.0, 0.0  };
         float maxs[3] = {  24.0,  24.0, 82.0 };
@@ -405,7 +401,7 @@ bool IsPointValidForPlayer(float point[3], bool initalCheck = false, int spawnin
         );
 
         // debug, for visualizing
-        if ( g_iDebugSpawns > 0 )
+        if (g_iDebugSpawns > 0)
         {
             // This makes mins/maxes actually exist in the world at our chosen point instead of at origin
             AddVectors(point, mins, mins);
@@ -453,7 +449,7 @@ bool IsPointValidForPlayer(float point[3], bool initalCheck = false, int spawnin
         TR_EnumerateEntitiesBox(mins, maxs, 0 /* don't mask any ents out */, ProjectileEnumerator, spawningClient);
 
         // debug, for visualizing
-        if ( g_iDebugSpawns > 0 )
+        if (g_iDebugSpawns > 0)
         {
             float life = 5.0;
             TE_SendBeamBoxToAll
@@ -529,18 +525,18 @@ public bool ProjectileEnumerator(int entity, int spawningClient)
 
     // This checks if the player or projectile within this box is on the same team
     // as the player we are trying to spawn here or not
-    if ( StrEqual(classname, "player") || StrContains(classname, "proj_") != -1 )
+    if (StrEqual(classname, "player") || StrContains(classname, "proj_") != -1)
     {
         TFTeam foundEntityTeam;
         // player
-        if ( entity <= MaxClients )
+        if (entity <= MaxClients)
         {
             foundEntityTeam = TF2_GetClientTeam(entity);
         }
         // projectile
         else
         {
-            foundEntityTeam = view_as<TFTeam>( GetEntProp(entity, Prop_Send, "m_iTeamNum") );
+            foundEntityTeam = view_as<TFTeam>(GetEntProp(entity, Prop_Send, "m_iTeamNum"));
         }
 
         TFTeam spawningClientTeam;
@@ -574,7 +570,7 @@ public bool WorldFilter(int entity, int contentsMask)
 }
 
 // True to allow ent to be hit, false otherwise
-public bool PlayerFilter(int entity, int contentsMask, int spawningClient)
+public bool PlayerFilter(int entity, int contentsMask)
 {
     // not a player
     if (entity > MaxClients)
@@ -1133,7 +1129,7 @@ public Action RandomSpawn(Handle timer, int userid)
     // get rid of roll lol
     angles[2] = 0.0;
 
-    if ( IsPointValidForPlayer(origin, false /* use 256x256 box */, client) )
+    if (IsPointValidForPlayer(origin, false /* use 256x256 box */, client))
     {
         ActuallySpawnPlayer(spawnpoint, origin, angles);
     }
@@ -1478,7 +1474,7 @@ public Action Regen(Handle timer, int clientid) {
             health = g_iMaxHealth[client];
         }
 
-        if ( GetClientHealth(client) <= g_iMaxHealth[client] )
+        if (GetClientHealth(client) <= g_iMaxHealth[client])
         {
             SetEntProp(client, Prop_Send, "m_iHealth", health, 1);
             SetEntProp(client, Prop_Data, "m_iHealth", health, 1);
@@ -1572,6 +1568,7 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
     CreateTimer(g_fSpawn, Respawn, clientid, TIMER_FLAG_NO_MAPCHANGE);
 
     int attacker = GetClientOfUserId(GetEventInt(event, "attacker"));
+    // int assister = GetClientOfUserId(GetEventInt(event, "assister"));
 
     int weapon1 = -1;
     int weapon2 = -1;
@@ -1625,7 +1622,7 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
             if ((GetClientHealth(attacker) + g_iKillHealStatic) > g_iMaxHealth[attacker]) {
                 targetHealth = g_iMaxHealth[attacker];
             } else {
-                targetHealth =  GetClientHealth(attacker) + g_iKillHealStatic;
+                targetHealth = GetClientHealth(attacker) + g_iKillHealStatic;
             }
         }
 
@@ -1635,38 +1632,35 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
 
         // Gives full ammo for primary and secondary weapon to the player who got the kill.
         // This is not compatable with unlockreplacer, because as far as i can tell, it doesn't even work anymore.
-        if (g_bKillAmmo) {
-            // if you somehow get it to work, it's still not compatible, sorry!
-            if (FindConVar("sm_unlock_version") == null) {
-                // Check the primary weapon, and set its ammo.
-                // make sure the weapon is actually a real one!
-                if (weapon1 == -1 || weaponID1 == -1) {
-                    return Plugin_Continue;
-                }
-                // Widowmaker can not be reliably resupped, and the point of the weapon is literally infinite ammo for aiming anyway. Skip it!
-                else if (weaponID1 == 527) {
-                    return Plugin_Continue;
-                }
-                // this fixes the cow mangler and pomson
-                else if (weaponID1 == 441 || weaponID1 == 588) {
-                    SetEntPropFloat(GetPlayerWeaponSlot(attacker, 0), Prop_Send, "m_flEnergy", 20.0);
-                }
-                else if (g_iMaxClips1[attacker] > 0) {
-                    SetEntProp(GetPlayerWeaponSlot(attacker, 0), Prop_Send, "m_iClip1", g_iMaxClips1[attacker]);
-
-                }
-                // Check the secondary weapon, and set its ammo.
-                // make sure the weapon is actually a real one!
-                if (weapon2 == -1 || weaponID2 == -1) {
-                    return Plugin_Continue;
-                }
-                // this fixes the bison
-                else if (weaponID2 == 442) {
-                    SetEntPropFloat(GetPlayerWeaponSlot(attacker, 1), Prop_Send, "m_flEnergy", 20.0);
-                }
-                else if (g_iMaxClips2[attacker] > 0) {
-                    SetEntProp(GetPlayerWeaponSlot(attacker, 1), Prop_Send, "m_iClip1", g_iMaxClips2[attacker]);
-                }
+        if (g_bKillAmmo && FindConVar("sm_unlock_version") == null)
+        {
+            // Check the primary weapon, and set its ammo.
+            // make sure the weapon is actually a real one!
+            if (weapon1 == -1 || weaponID1 == -1) {
+                return Plugin_Continue;
+            }
+            // Widowmaker can not be reliably resupped, and the point of the weapon is literally infinite ammo for aiming anyway. Skip it!
+            else if (weaponID1 == 527) {
+                return Plugin_Continue;
+            }
+            // this fixes the cow mangler and pomson
+            else if (weaponID1 == 441 || weaponID1 == 588) {
+                SetEntPropFloat(GetPlayerWeaponSlot(attacker, 0), Prop_Send, "m_flEnergy", 20.0);
+            }
+            else if (g_iMaxClips1[attacker] > 0) {
+                SetEntProp(GetPlayerWeaponSlot(attacker, 0), Prop_Send, "m_iClip1", g_iMaxClips1[attacker]);
+            }
+            // Check the secondary weapon, and set its ammo.
+            // make sure the weapon is actually a real one!
+            if (weapon2 == -1 || weaponID2 == -1) {
+                return Plugin_Continue;
+            }
+            // this fixes the bison
+            else if (weaponID2 == 442) {
+                SetEntPropFloat(GetPlayerWeaponSlot(attacker, 1), Prop_Send, "m_flEnergy", 20.0);
+            }
+            else if (g_iMaxClips2[attacker] > 0) {
+                SetEntProp(GetPlayerWeaponSlot(attacker, 1), Prop_Send, "m_iClip1", g_iMaxClips2[attacker]);
             }
         }
 
@@ -1762,7 +1756,7 @@ public Action Event_player_spawn(Handle event, const char[] name, bool dontBroad
 
     g_hRegenTimer[client] = CreateTimer(0.1, StartRegen, clientid);
 
-    if ( !IsValidClient(client) )
+    if (!IsValidClient(client))
     {
         return Plugin_Continue;
     }
@@ -1900,14 +1894,6 @@ void DoEnt(int i, int entity)
 {
     if (IsValidEntity(entity))
     {
-        if ( StrEqual(g_entIter[i], "info_player_teamspawn") )
-        {
-            LogMessage("->");
-            // ^^ remove this
-            if (true){}
-
-            // RemoveEntity(entity);
-        }
         // remove arena logic (disabling doesn't properly disable the fight / spectate bullshit)
         if (StrContains(g_entIter[i], "tf_logic_arena", false) != -1)
         {
@@ -1981,16 +1967,6 @@ void DoEnt(int i, int entity)
             RemoveEntity(entity);
         }
         */
-        else if (StrContains(g_entIter[i], "obj_", false) != -1)
-        {
-            LogMessage("-> obj");
-            // SetVariantInt(0);
-            // AcceptEntityInput(entity, "SetSolidToPlayer");
-            // SetEntityCollisionGroup(entity, 0);
-            // EntityCollisionRulesChanged(entity);
-            // FIXME ! !! !
-            if (true) {}
-        }
 
         // disable every other found matching ent instead of deleting, deleting certain logic/team timer ents is unneeded and can crash servers
         else
@@ -2290,7 +2266,7 @@ public bool GetConfigPath(const char[] map, char[] path, int maxlength)
     while (dh.GetNext(file, sizeof(file)))
     {
         // match was found at the start of the string
-        if  ( StrContains(file, cleanMap, false) == 0 )
+        if (StrContains(file, cleanMap, false) == 0)
         {
             LogMessage("Found near match %s.", file);
             strcopy(foundFile, sizeof(foundFile), file);
