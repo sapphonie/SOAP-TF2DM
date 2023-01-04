@@ -120,7 +120,7 @@ bool g_bEnableFallbackConfig;
 Handle g_hEnableFallbackConfig;
 
 
-const char spawnSound = "items/spawn_item.wav";
+char spawnSound[24] = "items/spawn_item.wav";
 
 // Entities to remove - don't worry! these all get reloaded on round start!
 char g_entIter[][] =
@@ -369,14 +369,14 @@ void InitSpawnSys()
 
 // initalCheck being true means we're checking only if the spawn
 int  entityHit = -1;
-bool IsPointValidForPlayer(float point[3], bool initalCheck = false, int spawningClient = -1, bool showBox = false)
+bool IsPointValidForPlayer(float point[3], bool initalCheck = false, int spawningClient = -1)
 {
     if (initalCheck)
     {
         // test if this spawn is even remotely sane
         if (TR_PointOutsideWorld(point))
         {
-            MC_PrintToChatAll(SOAP_TAG ... "Spawn at %.2f %.2f %.2f is COMPLETELY outside the world!", origin[0], origin[1], origin[2]);
+            MC_PrintToChatAll(SOAP_TAG ... "Spawn at %.2f %.2f %.2f is COMPLETELY outside the world!", point[0], point[1], point[2]);
             LogError("Spawn at %.2f %.2f %.2f is outside the world! Aborting...", point[0], point[1], point[2]);
             return false;
         }
@@ -582,8 +582,6 @@ public bool PlayerFilter(int entity, int contentsMask)
     {
         return true;
     }
-
-    return false;
 }
 
 // Some day I will rewrite this
@@ -1131,7 +1129,7 @@ public Action RandomSpawn(Handle timer, int userid)
 
     if (IsPointValidForPlayer(origin, false /* use 256x256 box */, client))
     {
-        ActuallySpawnPlayer(spawnpoint, origin, angles);
+        ActuallySpawnPlayer(client, origin, angles);
     }
     else
     {
@@ -1741,6 +1739,7 @@ public Action Event_player_spawn(Handle event, const char[] name, bool dontBroad
 {
     int client      = GetClientOfUserId(GetEventInt(event, "userid"));
     int clientid    = GetClientUserId(client);
+
 
     // No sentries!
     int flags   = GetEntityFlags(client);
