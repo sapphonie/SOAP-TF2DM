@@ -530,7 +530,7 @@ bool IsPointValidForPlayer(float point[3], bool initalCheck = false, int spawnin
         }
 
         // Check if enemy player or enemy projectile is within sizeOfBox units cubed of this point
-        const float sizeOfBox = 386.0;
+        const float sizeOfBox = 256.0;
         mins = { -sizeOfBox, -sizeOfBox, -sizeOfBox };
         maxs = {  sizeOfBox,  sizeOfBox,  sizeOfBox };
 
