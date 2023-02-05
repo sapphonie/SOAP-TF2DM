@@ -337,6 +337,11 @@ public MRESReturn Detour_CTFPlayer__ForceRespawn(Address pThis)
     // LogMessage("-> !!!!!Detour_CTFPlayer__ForceRespawn!!!!!!!!");
     // LogMessage("ent = %x", pThis);
 
+    // Don't inhibit spawns on maps without actual spawns
+    if (!g_bSpawnMap)
+    {
+        return MRES_Ignored;
+    }
     int client = SDKCall(SDKCall_GetBaseEntity, pThis);
 
     if (dontSpawnClient[client])
