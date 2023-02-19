@@ -331,6 +331,7 @@ public MRESReturn Detour_CTFPlayer__ForceRespawn(Address pThis)
     // I don't know why this would ever happen but just in case
     if (!pThis)
     {
+        LogMessage("no this");
         return MRES_Ignored;
     }
 
@@ -340,12 +341,21 @@ public MRESReturn Detour_CTFPlayer__ForceRespawn(Address pThis)
     // Don't inhibit spawns on maps without actual spawns
     if (!g_bSpawnMap)
     {
+        LogMessage("no g_bSpawnMap");
         return MRES_Ignored;
     }
+
     int client = SDKCall(SDKCall_GetBaseEntity, pThis);
+    LogMessage("client = %N", client);
+
+    if (IsClientSourceTV(client) || IsClientReplay(client))
+    {
+        return MRES_Ignored;
+    }
 
     if (dontSpawnClient[client])
     {
+        LogMessage("dontSpawnClient = %N", dontSpawnClient[client]);
         return MRES_Supercede;
     }
 
@@ -850,6 +860,8 @@ public void OnClientConnected(int client) {
     // Kills the annoying 30 second "waiting for players" at the start of a map.
     //ServerCommand("mp_waitingforplayers_cancel 1");
     SetConVarInt(FindConVar("mp_waitingforplayers_time"), 0);
+
+    dontSpawnClient[client] = false;
 }
 
 /* OnClientDisconnect()
@@ -862,6 +874,8 @@ public void OnClientDisconnect(int client) {
         KillTimer(g_hRegenTimer[client]);
         g_hRegenTimer[client] = null;
     }
+
+    dontSpawnClient[client] = false;
 }
 
 /* handler_ConVarChange()
@@ -1912,6 +1926,7 @@ public Action Event_player_team(Handle event, const char[] name, bool dontBroadc
         // spec / unassigned
         if (oldteam == 0 || oldteam == 1)
         {
+            // dontSpawnClient[client] = false;
             CreateTimer(g_fSpawn, Respawn, clientid);
         }
     }
