@@ -311,7 +311,7 @@ public MRESReturn Detour_CTFPlayer__ForceRespawn(Address pThis)
     }
 
     int client = SDKCall(SDKCall_GetBaseEntity, pThis);
-    LogMessage("client = %N", client);
+    //LogMessage("client = %N", client);
 
     if (IsClientSourceTV(client) || IsClientReplay(client))
     {
@@ -320,7 +320,7 @@ public MRESReturn Detour_CTFPlayer__ForceRespawn(Address pThis)
 
     if (dontSpawnClient[client])
     {
-        LogMessage("dontSpawnClient = %N", dontSpawnClient[client]);
+        //LogMessage("dontSpawnClient = %N", dontSpawnClient[client]);
         return MRES_Supercede;
     }
 
@@ -553,7 +553,7 @@ bool IsPointValidForPlayer(float point[3], bool initalCheck = false, int spawnin
 
         if (entityHit > 0)
         {
-            LogMessage("Spawn at %.2f %.2f %.2f hit... something?!?! ent = %i - Aborting...", point[0], point[1], point[2], entityHit);
+            // LogMessage("Spawn at %.2f %.2f %.2f hit... something?!?! ent = %i - Aborting...", point[0], point[1], point[2], entityHit);
             return false;
         }
     }
@@ -1481,7 +1481,7 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
     CreateTimer(GetConVarFloat(soap_spawn_delay), Respawn, userid, TIMER_FLAG_NO_MAPCHANGE);
 
     int attacker    = GetClientOfUserId(GetEventInt(event, "attacker"));
-    LogMessage("attacker = %i", attacker);
+    // LogMessage("attacker = %i", attacker);
     // int assister = GetClientOfUserId(GetEventInt(event, "assister"));
 
 
@@ -1802,7 +1802,7 @@ public Action Event_player_team(Handle event, const char[] name, bool dontBroadc
 
     if ( team != oldteam )
     {
-        LogMessage("player team ->");
+        // LogMessage("player team ->");
         ResetPlayerDmgBasedRegen(client, true);
         // spec / unassigned
         if (oldteam == 0 || oldteam == 1)
