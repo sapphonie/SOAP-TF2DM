@@ -4,10 +4,15 @@
 	{
 		"Version"
 		{
-			"Latest"	"4.4.5"
+			"Latest"	"4.4.6"
 		}
-		"Notes"		"Changes in 4.4.5"
-		"Notes"		"- SOAP will now not delete arena logic if mp_tournament is set to 1, as deleting arena logic breaks legitimate arena play."
+		"Notes"		"Changes in 4.4.6"
+		"Notes"		"- Updated spawn system to hopefully improve player experience:"
+		"Notes"		"- SOAP will now refuse to spawn a player at a spawn point if there are other players or projectiles within 386x386x386 units of it."
+		"Notes"		"- Players will now wait in spectate instead of sitting in spawn if no valid spawn points can be found."
+		"Notes"		"- Players will be teleported instantly to a valid spawn point instead of being spawned in the spawn room and teleported a few frames later, this fixes an annoying behavior where players' screens would flash."
+		"Notes"		"- Sentries will no longer target players while SOAP is active"
+		"Notes"		"- Misc code cleanup, and SOAP now requires SourceMod 1.11 to function"
 	}
 
 	"Files"

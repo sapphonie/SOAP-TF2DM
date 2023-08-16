@@ -1,0 +1,43 @@
+"Games"
+{
+    "tf"
+    {
+        "Functions"
+        {
+            "CTFPlayer::ForceRespawn"
+            {
+                "signature" "CTFPlayer::ForceRespawn"
+                "callconv"  "thiscall"
+                "return"    "void"
+                "this"      "address"
+            }
+            "CTFGameRules::Think"
+            {
+                "signature" "CTFGameRules::Think"
+                "callconv"  "thiscall"
+                "return"    "void"
+                "this"      "address"
+            }
+        }
+
+        "Signatures"
+        {
+            "CTFPlayer::ForceRespawn"
+            {
+                "linux" "@_ZN9CTFPlayer12ForceRespawnEv"
+            }
+            "CTFGameRules::Think"
+            {
+                "linux" "@_ZN12CTFGameRules5ThinkEv"
+            }
+        }
+        "Offsets"
+        {
+            "CBaseEntity::GetBaseEntity"
+            {
+                "windows"   "5"
+                "linux"     "6"
+            }
+        }
+    }
+}
