@@ -224,7 +224,6 @@ public void OnPluginStart()
     HookConVarChange(g_hNoVelocityOnSpawn,    handler_ConVarChange);
     HookConVarChange(g_hDebugSpawns,          handler_ConVarChange);
     HookConVarChange(g_hEnableFallbackConfig, handler_ConVarChange);
-    HookConVarChange(g_hReloadMapOnLoad,      handler_ConVarChange);
 
     HookEvent("player_death", Event_player_death);
     HookEvent("player_hurt", Event_player_hurt);
