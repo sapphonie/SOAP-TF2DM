@@ -134,7 +134,7 @@ char g_entIter[][] =
     "logic_relay",                      // DISABLE      - ^
     "item_teamflag",                    // DISABLE      - ^
     "trigger_capture_area",             // TELEPORT     - we tele these ents under the map by 5000 units to disable them - otherwise, huds bug out occasionally
-    "tf_logic_arena",                   // DELETE*      - need to delete these, otherwise fight / spectate bullshit shows up on arena maps.
+    "tf_logic_arena",                   // DELETE*      - need to delete these, otherwise fight / spectate bullshit shows up on arena maps
                                         //                set mp_tournament to 1 to prevent this, since nuking the ents permanently breaks arena mode, for some dumb tf2 reason
                                         //                if this is not acceptable for your use case, please open a github issue and i will address it, thank you!
     "func_regenerate",                  // DELETE       - deleting this ent is the only way to reliably prevent it from working in DM otherwise
@@ -514,6 +514,7 @@ public void OnConfigsExecuted()
         ServerCommand("exec %s", map);
     }
 }
+
 
 /* OnClientConnected()
  *
