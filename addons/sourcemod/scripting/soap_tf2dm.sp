@@ -104,8 +104,7 @@ int te_modelidx;
 Handle mp_tournament;
 
 //map reload
-int g_iReloadMapOnLoad;
-Handle g_hReloadMapOnLoad;
+ConVar g_hReloadMapOnLoad;
 
 // Regen damage given on kill
 #define RECENT_DAMAGE_SECONDS 10
@@ -179,7 +178,6 @@ public void OnPluginStart()
     // Create convars
     // make soap version cvar unchageable to work around older autogen'd configs resetting it back to 3.8
     CreateConVar("soap", PLUGIN_VERSION, PLUGIN_NAME, FCVAR_SPONLY | FCVAR_DONTRECORD | FCVAR_CHEAT);
-    g_hReloadMapOnLoad      = CreateConVar("soap_ReloadMapOnLoad", "1", "Allows you to disable map config running when the config is loaded.", FCVAR_NOTIFY);
     g_hRegenHP              = CreateConVar("soap_regenhp", "1", "Health added per regeneration tick. Set to 0 to disable.", FCVAR_NOTIFY);
     g_hRegenTick            = CreateConVar("soap_regentick", "0.1", "Delay between regeration ticks.", FCVAR_NOTIFY);
     g_hRegenDelay           = CreateConVar("soap_regendelay", "5.0", "Seconds after damage before regeneration.", FCVAR_NOTIFY);
@@ -200,12 +198,12 @@ public void OnPluginStart()
     g_hNoVelocityOnSpawn    = CreateConVar("soap_novelocityonspawn", "1", "Prevents players from inheriting their velocity from previous lives when spawning thru SOAP.", FCVAR_NOTIFY);
     g_hDebugSpawns          = CreateConVar("soap_debugspawns", "0", "Set to 1 to draw boxes around spawn points when players spawn. Set to 2 to draw ALL spawn points constantly. For debugging.", FCVAR_NOTIFY, true, 0.0, true, 2.0);
     g_hEnableFallbackConfig = CreateConVar("soap_fallback_config", "1", "Enable falling back to spawns from other versions of the map if no spawns are configured for the current map.", FCVAR_NOTIFY);
+    g_hReloadMapOnLoad      = CreateConVar("soap_run_mapcfg_on_plugin_load", "1", "Determines if SOAP should execute the currently running map's config file upon being loaded.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
     // for determining whether to delete arena entities or not
     mp_tournament           = FindConVar("mp_tournament");
 
     // Hook convar changes and events
-    HookConVarChange(g_hReloadMapOnLoad,      handler_ConVarChange);
     HookConVarChange(g_hRegenHP,              handler_ConVarChange);
     HookConVarChange(g_hRegenTick,            handler_ConVarChange);
     HookConVarChange(g_hRegenDelay,           handler_ConVarChange);
@@ -226,6 +224,7 @@ public void OnPluginStart()
     HookConVarChange(g_hNoVelocityOnSpawn,    handler_ConVarChange);
     HookConVarChange(g_hDebugSpawns,          handler_ConVarChange);
     HookConVarChange(g_hEnableFallbackConfig, handler_ConVarChange);
+    HookConVarChange(g_hReloadMapOnLoad,      handler_ConVarChange);
 
     HookEvent("player_death", Event_player_death);
     HookEvent("player_hurt", Event_player_hurt);
@@ -477,7 +476,6 @@ public void OnMapEnd()
 public void OnConfigsExecuted()
 {
     // Get the values for internal global variables.
-    g_iReloadMapOnLoad          = GetConVarInt(g_hReloadMapOnLoad);
     g_iRegenHP                  = GetConVarInt(g_hRegenHP);
     g_fRegenTick                = GetConVarFloat(g_hRegenTick);
     g_fRegenDelay               = GetConVarFloat(g_hRegenDelay);
@@ -510,14 +508,10 @@ public void OnConfigsExecuted()
     char map[64];
     GetCurrentMapLowercase(map, sizeof(map));
 
-    if(g_iReloadMapOnLoad == 1)
+    // Rerun map config unless user has turned off doing so
+    if (g_hReloadMapOnLoad.BoolValue)
     {
-    ServerCommand("exec %s", map);
-    }
-
-    else
-    {
-    ServerCommand("say Map config reload has been skipped");
+        ServerCommand("exec %s", map);
     }
 }
 
@@ -559,11 +553,7 @@ public void OnClientDisconnect(int client) {
 public void handler_ConVarChange(Handle convar, const char[] oldValue, const char[] newValue) {
     // When a cvar is changed during runtime, this is called and the corresponding internal variable is updated to reflect this change.
     // SourcePawn can't `switch` with Strings, so this huge if/else chain is our only option.
-    if (convar == g_hReloadMapOnLoad)
-    {
-        g_iReloadMapOnLoad = StringToInt(newValue);
-    }
-    else if (convar == g_hRegenHP)
+    if (convar == g_hRegenHP)
     {
         g_iRegenHP = StringToInt(newValue);
     }
