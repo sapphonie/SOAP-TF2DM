@@ -21,7 +21,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.4.5"
+#define PLUGIN_VERSION      "4.4.6"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -103,6 +103,10 @@ int te_modelidx;
 // mp_tourney convar
 Handle mp_tournament;
 
+//map reload
+int g_iReloadMapOnLoad;
+Handle g_hReloadMapOnLoad;
+
 // Regen damage given on kill
 #define RECENT_DAMAGE_SECONDS 10
 int g_iRecentDamage[MAXPLAYERS+1][MAXPLAYERS+1][RECENT_DAMAGE_SECONDS];
@@ -131,7 +135,7 @@ char g_entIter[][] =
     "logic_relay",                      // DISABLE      - ^
     "item_teamflag",                    // DISABLE      - ^
     "trigger_capture_area",             // TELEPORT     - we tele these ents under the map by 5000 units to disable them - otherwise, huds bug out occasionally
-    "tf_logic_arena",                   // DELETE*      - need to delete these, otherwise fight / spectate bullshit shows up on arena maps
+    "tf_logic_arena",                   // DELETE*      - need to delete these, otherwise fight / spectate bullshit shows up on arena maps.
                                         //                set mp_tournament to 1 to prevent this, since nuking the ents permanently breaks arena mode, for some dumb tf2 reason
                                         //                if this is not acceptable for your use case, please open a github issue and i will address it, thank you!
     "func_regenerate",                  // DELETE       - deleting this ent is the only way to reliably prevent it from working in DM otherwise
@@ -175,6 +179,7 @@ public void OnPluginStart()
     // Create convars
     // make soap version cvar unchageable to work around older autogen'd configs resetting it back to 3.8
     CreateConVar("soap", PLUGIN_VERSION, PLUGIN_NAME, FCVAR_SPONLY | FCVAR_DONTRECORD | FCVAR_CHEAT);
+    g_hReloadMapOnLoad      = CreateConVar("soap_ReloadMapOnLoad", "1", "Allows you to disable map config running when the config is loaded.", FCVAR_NOTIFY);
     g_hRegenHP              = CreateConVar("soap_regenhp", "1", "Health added per regeneration tick. Set to 0 to disable.", FCVAR_NOTIFY);
     g_hRegenTick            = CreateConVar("soap_regentick", "0.1", "Delay between regeration ticks.", FCVAR_NOTIFY);
     g_hRegenDelay           = CreateConVar("soap_regendelay", "5.0", "Seconds after damage before regeneration.", FCVAR_NOTIFY);
@@ -200,6 +205,7 @@ public void OnPluginStart()
     mp_tournament           = FindConVar("mp_tournament");
 
     // Hook convar changes and events
+    HookConVarChange(g_hReloadMapOnLoad,      handler_ConVarChange);
     HookConVarChange(g_hRegenHP,              handler_ConVarChange);
     HookConVarChange(g_hRegenTick,            handler_ConVarChange);
     HookConVarChange(g_hRegenDelay,           handler_ConVarChange);
@@ -471,6 +477,7 @@ public void OnMapEnd()
 public void OnConfigsExecuted()
 {
     // Get the values for internal global variables.
+    g_iReloadMapOnLoad          = GetConVarInt(g_hReloadMapOnLoad);
     g_iRegenHP                  = GetConVarInt(g_hRegenHP);
     g_fRegenTick                = GetConVarFloat(g_hRegenTick);
     g_fRegenDelay               = GetConVarFloat(g_hRegenDelay);
@@ -503,9 +510,16 @@ public void OnConfigsExecuted()
     char map[64];
     GetCurrentMapLowercase(map, sizeof(map));
 
+    if(g_iReloadMapOnLoad == 1)
+    {
     ServerCommand("exec %s", map);
-}
+    }
 
+    else
+    {
+    ServerCommand("say Map config reload has been skipped");
+    }
+}
 
 /* OnClientConnected()
  *
@@ -545,7 +559,11 @@ public void OnClientDisconnect(int client) {
 public void handler_ConVarChange(Handle convar, const char[] oldValue, const char[] newValue) {
     // When a cvar is changed during runtime, this is called and the corresponding internal variable is updated to reflect this change.
     // SourcePawn can't `switch` with Strings, so this huge if/else chain is our only option.
-    if (convar == g_hRegenHP)
+    if (convar == g_hReloadMapOnLoad)
+    {
+        g_iReloadMapOnLoad = StringToInt(newValue);
+    }
+    else if (convar == g_hRegenHP)
     {
         g_iRegenHP = StringToInt(newValue);
     }
