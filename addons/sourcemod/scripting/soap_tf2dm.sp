@@ -21,7 +21,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.4.5"
+#define PLUGIN_VERSION      "4.4.6"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -102,6 +102,9 @@ int te_modelidx;
 
 // mp_tourney convar
 Handle mp_tournament;
+
+//map reload
+ConVar g_hReloadMapOnLoad;
 
 // Regen damage given on kill
 #define RECENT_DAMAGE_SECONDS 10
@@ -195,6 +198,7 @@ public void OnPluginStart()
     g_hNoVelocityOnSpawn    = CreateConVar("soap_novelocityonspawn", "1", "Prevents players from inheriting their velocity from previous lives when spawning thru SOAP.", FCVAR_NOTIFY);
     g_hDebugSpawns          = CreateConVar("soap_debugspawns", "0", "Set to 1 to draw boxes around spawn points when players spawn. Set to 2 to draw ALL spawn points constantly. For debugging.", FCVAR_NOTIFY, true, 0.0, true, 2.0);
     g_hEnableFallbackConfig = CreateConVar("soap_fallback_config", "1", "Enable falling back to spawns from other versions of the map if no spawns are configured for the current map.", FCVAR_NOTIFY);
+    g_hReloadMapOnLoad      = CreateConVar("soap_run_mapcfg_on_plugin_load", "1", "Determines if SOAP should execute the currently running map's config file upon being loaded.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
 
     // for determining whether to delete arena entities or not
     mp_tournament           = FindConVar("mp_tournament");
@@ -503,7 +507,11 @@ public void OnConfigsExecuted()
     char map[64];
     GetCurrentMapLowercase(map, sizeof(map));
 
-    ServerCommand("exec %s", map);
+    // Rerun map config unless user has turned off doing so
+    if (g_hReloadMapOnLoad.BoolValue)
+    {
+        ServerCommand("exec %s", map);
+    }
 }
 
 
