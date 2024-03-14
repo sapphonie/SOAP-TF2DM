@@ -4,10 +4,10 @@
 	{
 		"Version"
 		{
-			"Latest"	"4.4.5"
+			"Latest"	"4.4.7"
 		}
-		"Notes"		"Changes in 4.4.5"
-		"Notes"		"- SOAP will now not delete arena logic if mp_tournament is set to 1, as deleting arena logic breaks legitimate arena play."
+		"Notes"		"Changes in 4.4.7"
+		"Notes"		"- Corrected updater version mismatch and version number of the plugin."
 	}
 
 	"Files"
