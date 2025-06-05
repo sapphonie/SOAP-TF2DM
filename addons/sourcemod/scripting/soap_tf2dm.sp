@@ -244,7 +244,7 @@ public void OnPluginStart()
     // Create configuration file in cfg/sourcemod folder
     AutoExecConfig(true, "soap_tf2dm", "sourcemod");
 
-    g_normalizeMapRegex = new Regex("(_(a|b|beta|u|r|v|rc|f|final|comptf|ugc)?[0-9]*[a-z]?$)|([0-9]+[a-z]?$)", 0);
+    g_normalizeMapRegex = new Regex("(_((a|b|beta|u|r|v|rc|f|final|comptf|ugc)?[0-9]*[a-z]?)*$)|([0-9]+[a-z]?$)", 0);
 
     GetRealClientCount();
 
