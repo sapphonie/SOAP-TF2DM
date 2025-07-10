@@ -4,10 +4,11 @@
 	{
 		"Version"
 		{
-			"Latest"	"4.4.7"
+			"Latest"	"4.4.8"
 		}
-		"Notes"		"Changes in 4.4.7"
-		"Notes"		"- Corrected updater version mismatch and version number of the plugin."
+		"Notes"		"Changes in 4.4.8"
+		"Notes"		"- Better fuzzy map searching for fallback configs"
+		"Notes"		"- Thanks @icewind1991 !"
 	}
 
 	"Files"
