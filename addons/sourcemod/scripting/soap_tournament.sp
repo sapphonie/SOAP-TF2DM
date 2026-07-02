@@ -14,7 +14,6 @@
 #define PLUGIN_CONTACT      "https://sappho.io"
 #define RED                 0
 #define BLU                 1
-#define TEAM_OFFSET         2
 
 // ====[ PLUGIN ]======================================================
 public Plugin myinfo =
@@ -33,9 +32,6 @@ public Plugin myinfo =
 
 bool teamReadyState[2];
 bool dming;
-Handle redPlayersReady;
-Handle bluePlayersReady;
-Handle g_readymode_min;
 // global forward handle;
 Handle g_StopDeathMatching;
 Handle g_StartDeathMatching;
@@ -69,14 +65,8 @@ public void OnPluginStart()
 
     HookEvent("tournament_stateupdate", Event_TournamentStateupdate);
 
-    // Hook for events when player changes their team.
-    HookEvent("player_team", Event_PlayerTeam);
-
     // Hook into mp_tournament_restart
     RegServerCmd("mp_tournament_restart", TournamentRestartHook);
-
-    // Listen for player readying or unreadying.
-    AddCommandListener(Listener_TournamentPlayerReadystate, "tournament_player_readystate");
 
     // maybe todo: force teamreadymode to 0 and remove the old logic as that cvar appears to be broken in tf2,
     // causing issues where soap works perfectly fine but the announcer never starts the countdown nor does the game ever start
@@ -85,14 +75,10 @@ public void OnPluginStart()
 
     g_cvEnforceReadyModeCountdown = CreateConVar("soap_enforce_readymode_countdown", "1", "Set as 1 to keep mp_tournament_readymode_countdown 5 so P-Rec works properly", _, true, 0.0, true, 1.0);
     g_cvReadyModeCountdown = FindConVar("mp_tournament_readymode_countdown");
-    g_readymode_min = FindConVar("mp_tournament_readymode_min");
 
     SetConVarInt(g_cvReadyModeCountdown, 5, true, true);
     HookConVarChange(g_cvEnforceReadyModeCountdown, handler_ConVarChange);
     HookConVarChange(g_cvReadyModeCountdown, handler_ConVarChange);
-
-    redPlayersReady = CreateArray();
-    bluePlayersReady = CreateArray();
 
     // add a global forward for other plugins to use
     g_StopDeathMatching  = CreateGlobalForward("SOAP_StopDeathMatching", ET_Event);
@@ -120,6 +106,18 @@ public void OnMapStart()
     dming = false;
     ServerCommand("mp_tournament_restart");
     StartDeathmatching();
+
+    // In mp_tournament_readymode the game never fires tournament_stateupdate -
+    // it silently flips the m_bTeamReady gamerules props once every player on a
+    // team has readied up. Poll those props to catch ready-ups in that mode.
+    CreateTimer(1.0, Timer_CheckReadyState, _, TIMER_REPEAT | TIMER_FLAG_NO_MAPCHANGE);
+}
+
+public Action Timer_CheckReadyState(Handle timer)
+{
+    CheckTeamReadyState();
+
+    return Plugin_Continue;
 }
 
 /* StopDeathmatching()
@@ -132,8 +130,6 @@ void StopDeathmatching()
     Call_Finish();
     ServerCommand("exec sourcemod/soap_live.cfg");
     MC_PrintToChatAll(SOAP_TAG ... "{green}%t", "Plugins unloaded");
-    ClearArray(redPlayersReady);
-    ClearArray(bluePlayersReady);
     dming = false;
 }
 
@@ -147,15 +143,24 @@ void StartDeathmatching()
     Call_Finish();
     ServerCommand("exec sourcemod/soap_notlive.cfg");
     MC_PrintToChatAll(SOAP_TAG ... "{red}%t", "Plugins reloaded");
-    ClearArray(redPlayersReady);
-    ClearArray(bluePlayersReady);
     dming = true;
 }
 
-// ====[ CALLBACKS ]===================================================
-
-public void Event_TournamentStateupdate(Handle event, const char[] name, bool dontBroadcast)
+/* CheckTeamReadyState()
+ *
+ * Reads the game's own per-team ready flags and starts/stops deathmatch
+ * accordingly. Works for both classic mp_tournament (F4) ready-ups and
+ * mp_tournament_readymode, since the game maintains m_bTeamReady in both.
+ * -------------------------------------------------------------------------- */
+void CheckTeamReadyState()
 {
+    // Ready-ups only happen during the pre-match waiting-for-players phase
+    // (the game's IsInPreMatch()); never touch plugins mid-match.
+    if (GameRules_GetProp("m_bInWaitingForPlayers") == 0)
+    {
+        return;
+    }
+
     // significantly more robust way of getting team ready status
     // the != 0 converts the result to a bool
     teamReadyState[RED] = GameRules_GetProp("m_bTeamReady", 1, 2) != 0;
@@ -164,7 +169,11 @@ public void Event_TournamentStateupdate(Handle event, const char[] name, bool do
     // If both teams are ready, StopDeathmatching.
     if (teamReadyState[RED] && teamReadyState[BLU])
     {
-        StopDeathmatching();
+        // don't stop deathmatching if we already stopped!
+        if (dming)
+        {
+            StopDeathmatching();
+        }
     }
     // don't start deathmatching again if we're already dming!
     else if (!dming)
@@ -174,24 +183,11 @@ public void Event_TournamentStateupdate(Handle event, const char[] name, bool do
     }
 }
 
-public Action Event_PlayerTeam(Handle event, const char[] name, bool dontBroadcast)
+// ====[ CALLBACKS ]===================================================
+
+public void Event_TournamentStateupdate(Handle event, const char[] name, bool dontBroadcast)
 {
-    int clientid = GetEventInt(event, "userid");
-
-    // players switching teams unreadies teams without triggering tournament_stateupdate. Crutch!
-    teamReadyState[RED] = GameRules_GetProp("m_bTeamReady", 1, 2) != 0;
-    teamReadyState[BLU] = GameRules_GetProp("m_bTeamReady", 1, 3) != 0;
-
-    if (FindValueInArray(redPlayersReady, clientid) != -1)
-    {
-        RemoveFromArray(redPlayersReady, FindValueInArray(redPlayersReady, clientid));
-    }
-    else if (FindValueInArray(bluePlayersReady, clientid) != -1)
-    {
-        RemoveFromArray(bluePlayersReady, FindValueInArray(bluePlayersReady, clientid));
-    }
-
-    return Plugin_Continue;
+    CheckTeamReadyState();
 }
 
 public Action Event_GameOver(Handle event, const char[] name, bool dontBroadcast)
@@ -222,42 +218,4 @@ public void handler_ConVarChange(Handle convar, const char[] oldValue, const cha
     {
         SetConVarInt(g_cvReadyModeCountdown, 5, true, true);
     }
-}
-
-public Action Listener_TournamentPlayerReadystate(int client, const char[] command, int args)
-{
-    char arg[4];
-    int min = GetConVarInt(g_readymode_min);
-    int clientid = GetClientUserId(client);
-    int clientTeam = GetClientTeam(client);
-
-    GetCmdArg(1, arg, sizeof(arg));
-    if (StrEqual(arg, "1"))
-    {
-        if (clientTeam - TEAM_OFFSET == 0)
-        {
-            PushArrayCell(redPlayersReady, clientid);
-        }
-        else if (clientTeam - TEAM_OFFSET == 1)
-        {
-            PushArrayCell(bluePlayersReady, clientid);
-        }
-    }
-    else if (StrEqual(arg, "0"))
-    {
-        if (clientTeam - TEAM_OFFSET == 0)
-        {
-            RemoveFromArray(redPlayersReady, FindValueInArray(redPlayersReady, clientid));
-        }
-        else if (clientTeam - TEAM_OFFSET == 1)
-        {
-            RemoveFromArray(bluePlayersReady, FindValueInArray(bluePlayersReady, clientid));
-        }
-    }
-    if (GetArraySize(redPlayersReady) == min && GetArraySize(bluePlayersReady) == min)
-    {
-        StopDeathmatching();
-    }
-
-    return Plugin_Continue;
 }
