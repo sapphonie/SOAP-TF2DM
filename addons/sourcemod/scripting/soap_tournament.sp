@@ -10,7 +10,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP Tournament"
 #define PLUGIN_AUTHOR       "Lange - maintained by sappho.io"
-#define PLUGIN_VERSION      "3.8.5"
+#define PLUGIN_VERSION      "3.8.7"
 #define PLUGIN_CONTACT      "https://sappho.io"
 #define RED                 0
 #define BLU                 1
