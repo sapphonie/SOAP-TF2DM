@@ -100,8 +100,9 @@ int g_iDebugSpawns;
 Handle Timer_ShowSpawns;
 int te_modelidx;
 
-// mp_tourney convar
+// mp_tourney convars
 Handle mp_tournament;
+Handle mp_tournament_readymode;
 
 // Regen damage given on kill
 #define RECENT_DAMAGE_SECONDS 10
@@ -198,6 +199,7 @@ public void OnPluginStart()
 
     // for determining whether to delete arena entities or not
     mp_tournament           = FindConVar("mp_tournament");
+    mp_tournament_readymode = FindConVar("mp_tournament_readymode");
 
     // Hook convar changes and events
     HookConVarChange(g_hRegenHP,              handler_ConVarChange);
@@ -521,9 +523,18 @@ public void OnClientConnected(int client) {
     // Reset the player's damage given/received to 0.
     ResetPlayerDmgBasedRegen(client, true);
 
-    // Kills the annoying 30 second "waiting for players" at the start of a map.
-    //ServerCommand("mp_waitingforplayers_cancel 1");
-    SetConVarInt(FindConVar("mp_waitingforplayers_time"), 0);
+    if (mp_tournament_readymode == null)
+    {
+        ThrowError("mp_tournament_readymode convar not found");
+    }
+
+    // Kills the annoying 30 second "waiting for players" at the start of a map,
+    // but only when mp_tournament_readymode is disabled — setting this to 0 while
+    // readymode is on permanently bypasses the ready-up phase, making it non-functional.
+    if (!GetConVarBool(mp_tournament_readymode))
+    {
+        SetConVarInt(FindConVar("mp_waitingforplayers_time"), 0);
+    }
 }
 
 /* OnClientDisconnect()
