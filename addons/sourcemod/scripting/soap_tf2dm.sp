@@ -523,10 +523,15 @@ public void OnClientConnected(int client) {
     // Reset the player's damage given/received to 0.
     ResetPlayerDmgBasedRegen(client, true);
 
+    if (mp_tournament_readymode == null)
+    {
+        ThrowError("mp_tournament_readymode convar not found");
+    }
+
     // Kills the annoying 30 second "waiting for players" at the start of a map,
     // but only when mp_tournament_readymode is disabled — setting this to 0 while
     // readymode is on permanently bypasses the ready-up phase, making it non-functional.
-    if (mp_tournament_readymode == null || !GetConVarBool(mp_tournament_readymode))
+    if (!GetConVarBool(mp_tournament_readymode))
     {
         SetConVarInt(FindConVar("mp_waitingforplayers_time"), 0);
     }
