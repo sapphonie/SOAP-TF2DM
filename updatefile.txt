@@ -4,11 +4,11 @@
 	{
 		"Version"
 		{
-			"Latest"	"4.4.8"
+			"Latest"	"4.4.9"
 		}
-		"Notes"		"Changes in 4.4.8"
-		"Notes"		"- Better fuzzy map searching for fallback configs"
-		"Notes"		"- Thanks @icewind1991 !"
+		"Notes"		"Changes in 4.4.9"
+		"Notes"		"- Fixes for mp_tournament_readymode 1"
+		"Notes"		"- Thanks @garrappachc !"
 	}
 
 	"Files"
