@@ -21,7 +21,7 @@
 // ====[ CONSTANTS ]===================================================
 #define PLUGIN_NAME         "SOAP TF2 Deathmatch"
 #define PLUGIN_AUTHOR       "Icewind, MikeJS, Lange, Tondark - maintained by sappho.io"
-#define PLUGIN_VERSION      "4.4.8"
+#define PLUGIN_VERSION      "4.4.9"
 #define PLUGIN_CONTACT      "https://steamcommunity.com/id/icewind1991, https://sappho.io"
 #define UPDATE_URL          "https://raw.githubusercontent.com/sapphonie/SOAP-TF2DM/master/updatefile.txt"
 
@@ -522,11 +522,6 @@ public void OnClientConnected(int client) {
 
     // Reset the player's damage given/received to 0.
     ResetPlayerDmgBasedRegen(client, true);
-
-    if (mp_tournament_readymode == null)
-    {
-        ThrowError("mp_tournament_readymode convar not found");
-    }
 
     // Kills the annoying 30 second "waiting for players" at the start of a map,
     // but only when mp_tournament_readymode is disabled — setting this to 0 while
