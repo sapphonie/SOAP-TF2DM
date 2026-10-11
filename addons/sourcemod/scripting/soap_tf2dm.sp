@@ -343,6 +343,7 @@ void InitSpawnSys()
     BuildPath(Path_SM, path, sizeof(path), "configs/soap/%s.cfg", map);
 
     // we got a local copy
+    // note this is case sensitive on linux 
     if (FileExists(path))
     {
         LoadMapConfig(map, path);
@@ -2198,9 +2199,8 @@ void GetCurrentMapLowercase(char[] map, int sizeofMap)
     GetCurrentMap(map, sizeofMap);
 
     // TF2 is case-insensitive when dealing with map names
-    for (int i = 0; i < sizeof(sizeofMap); ++i)
+    for (int i = 0; (i < sizeofMap && map[i] != 0x0); ++i)
     {
         map[i] = CharToLower(map[i]);
     }
-
 }
