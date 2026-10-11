@@ -251,8 +251,6 @@ public void OnPluginStart()
     GetRealClientCount();
 
     OnConfigsExecuted();
-
-    te_modelidx = PrecacheModel("effects/beam_generic_2.vmt", true);
 }
 
 public void OnLibraryAdded(const char[] name)
@@ -308,6 +306,10 @@ public void OnMapStart() {
 
     // Load the sound file played when a player is spawned.
     PrecacheSound("items/spawn_item.wav", true);
+
+    // precache this tempent all the time - it gets cleared off during mapchanges
+    // so if we just do it in OnPluginStart() we get a stale idx
+    te_modelidx = PrecacheModel("effects/beam_generic_2.vmt", true);
 
     // Begin the time check that prevents infinite rounds on A/D and KOTH maps.
     CreateTimeCheck();
