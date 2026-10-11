@@ -42,7 +42,7 @@ Handle g_hRegenTimer[MAXPLAYERS+1];
 Handle g_hRegenHP;
 Handle g_hRegenTick;
 Handle g_hRegenDelay;
-Handle g_hKillStartRegen;
+Handle g_hRegenOnKill;
 
 // Spawning
 bool g_bSpawnRandom;
@@ -179,7 +179,7 @@ public void OnPluginStart()
     g_hRegenHP              = CreateConVar("soap_regenhp", "1", "Health added per regeneration tick. Set to 0 to disable.", FCVAR_NOTIFY);
     g_hRegenTick            = CreateConVar("soap_regentick", "0.1", "Delay between regeration ticks.", FCVAR_NOTIFY);
     g_hRegenDelay           = CreateConVar("soap_regendelay", "5.0", "Seconds after damage before regeneration.", FCVAR_NOTIFY);
-    g_hKillStartRegen       = CreateConVar("soap_kill_start_regen", "1", "Start the heal-over-time regen immediately after a kill.", FCVAR_NOTIFY);
+    g_hRegenOnKill          = CreateConVar("soap_regen_on_kill", "0", "Start heal-over-time regen immediately after a kill. Replaces soap_kill_start_regen - cvar renamed and defaulted to 0 to maintain existing behavior.", FCVAR_NOTIFY);
     g_hSpawn                = CreateConVar("soap_spawn_delay", "1.5", "Spawn timer.", FCVAR_NOTIFY);
     g_hSpawnRandom          = CreateConVar("soap_spawnrandom", "1", "Enable random spawns.", FCVAR_NOTIFY);
     g_hTeamSpawnRandom      = CreateConVar("soap_teamspawnrandom", "0", "Enable random spawns independent of team", FCVAR_NOTIFY);
@@ -205,7 +205,7 @@ public void OnPluginStart()
     HookConVarChange(g_hRegenHP,              handler_ConVarChange);
     HookConVarChange(g_hRegenTick,            handler_ConVarChange);
     HookConVarChange(g_hRegenDelay,           handler_ConVarChange);
-    HookConVarChange(g_hKillStartRegen,       handler_ConVarChange);
+    HookConVarChange(g_hRegenOnKill,          handler_ConVarChange);
     HookConVarChange(g_hSpawn,                handler_ConVarChange);
     HookConVarChange(g_hSpawnRandom,          handler_ConVarChange);
     HookConVarChange(g_hTeamSpawnRandom,      handler_ConVarChange);
@@ -476,7 +476,7 @@ public void OnConfigsExecuted()
     g_iRegenHP                  = GetConVarInt(g_hRegenHP);
     g_fRegenTick                = GetConVarFloat(g_hRegenTick);
     g_fRegenDelay               = GetConVarFloat(g_hRegenDelay);
-    g_bKillStartRegen           = GetConVarBool(g_hKillStartRegen);
+    g_bKillStartRegen           = GetConVarBool(g_hRegenOnKill);
     g_fSpawn                    = GetConVarFloat(g_hSpawn);
     g_bSpawnRandom              = GetConVarBool(g_hSpawnRandom);
     g_fKillHealRatio            = GetConVarFloat(g_hKillHealRatio);
@@ -563,7 +563,7 @@ public void handler_ConVarChange(Handle convar, const char[] oldValue, const cha
     {
         g_fRegenDelay = StringToFloat(newValue);
     }
-    else if (convar == g_hKillStartRegen)
+    else if (convar == g_hRegenOnKill)
     {
         if (StringToInt(newValue) >= 1)
         {
@@ -1549,7 +1549,7 @@ public Action Event_player_death(Handle event, const char[] name, bool dontBroad
 
         // Give the killer regen-over-time if so configured.
         if (g_bKillStartRegen && !g_bRegen[attacker]) {
-            StartRegen(null, attacker);
+            StartRegen(null, GetClientUserId(attacker));
         }
     }
 
