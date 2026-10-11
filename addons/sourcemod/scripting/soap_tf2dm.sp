@@ -2017,7 +2017,7 @@ void FixNearbyDoorRelatedThings(int ent)
 void ResetPlayers() {
     int id;
     if (FirstLoad == true) {
-        for (int i = 0; i < MaxClients; i++) {
+        for (int i = 1; i <= MaxClients; i++) {
             if (IsValidClient(i)) {
                 id = GetClientUserId(i);
                 CreateTimer(g_fSpawn, Respawn, id, TIMER_FLAG_NO_MAPCHANGE);
@@ -2026,7 +2026,7 @@ void ResetPlayers() {
 
         FirstLoad = false;
     } else {
-        for (int i = 0; i < MaxClients; i++) {
+        for (int i = 1; i <= MaxClients; i++) {
             if (IsValidClient(i)) {
                 id = GetClientUserId(i);
                 CreateTimer(0.1, StartRegen, id, TIMER_FLAG_NO_MAPCHANGE);
