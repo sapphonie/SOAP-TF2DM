@@ -479,6 +479,7 @@ public void OnConfigsExecuted()
     g_bKillStartRegen           = GetConVarBool(g_hRegenOnKill);
     g_fSpawn                    = GetConVarFloat(g_hSpawn);
     g_bSpawnRandom              = GetConVarBool(g_hSpawnRandom);
+    g_bTeamSpawnRandom          = GetConVarBool(g_hTeamSpawnRandom);
     g_fKillHealRatio            = GetConVarFloat(g_hKillHealRatio);
     g_fDamageHealRatio          = GetConVarFloat(g_hDamageHealRatio);
     StartStopRecentDamagePushbackTimer();
