@@ -1295,6 +1295,23 @@ public Action Respawn(Handle timer, int clientid)
         return Plugin_Continue;
     }
 
+    // a half zatoichi decapitation removes the victim's katana ~2s (TF_DEATH_ANIMATION_TIME) after death
+    // we respawn faster than that, so TF2 keeps the doomed katana on respawn and the player loses it right after
+    // remove it ourselves while they're still dead, so TF2 gives them a fresh one. see issue #61
+    if (!IsPlayerAlive(client))
+    {
+        int melee = GetPlayerWeaponSlot(client, TFWeaponSlot_Melee);
+        if (melee != -1)
+        {
+            char classname[64];
+            GetEntityClassname(melee, classname, sizeof(classname));
+            if (StrEqual(classname, "tf_weapon_katana"))
+            {
+                TF2_RemoveWeaponSlot(client, TFWeaponSlot_Melee);
+            }
+        }
+    }
+
     TF2_RespawnPlayer(client);
 
     return Plugin_Continue;
