@@ -2162,6 +2162,11 @@ public bool GetConfigPath(const char[] map, char[] path, int maxlength)
     BuildPath(Path_SM, path, maxlength, "configs/soap");
     LogMessage("path %s", path);
     DirectoryListing dh = OpenDirectory(path);
+    // should never happen
+    if (dh == null)
+    {
+        return false;
+    }
     char file[128];
     char foundFile[128];
     bool foundMatch = false;
@@ -2176,6 +2181,7 @@ public bool GetConfigPath(const char[] map, char[] path, int maxlength)
             foundMatch = true;
         }
     }
+    delete dh;
 
     if (foundMatch)
     {
