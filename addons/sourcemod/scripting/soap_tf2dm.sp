@@ -323,9 +323,6 @@ void InitSpawnSys()
     // get rid of any spawns we might have
     ClearArray(g_hRedSpawns);
     ClearArray(g_hBluSpawns);
-    // make new ones. size of 6 because origin * 3 + angles * 3
-    g_hRedSpawns = CreateArray(6);
-    g_hBluSpawns = CreateArray(6);
 
     g_bSpawnMap = false;
 
