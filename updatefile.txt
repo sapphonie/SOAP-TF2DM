@@ -4,11 +4,15 @@
 	{
 		"Version"
 		{
-			"Latest"	"4.4.9"
+			"Latest"	"4.5.0"
 		}
-		"Notes"		"Changes in 4.4.9"
-		"Notes"		"- Fixes for mp_tournament_readymode 1"
-		"Notes"		"- Thanks @garrappachc !"
+		"Notes"		"Changes in 4.5.0"
+		"Notes"		"- BREAKING: soap_kill_start_regen is now soap_regen_on_kill (default 0)"
+		"Notes"		"- As a server you must rename or remove soap_kill_start_regen in cfg/sourcemod/soap_tf2dm.cfg"
+		"Notes"		"- Fixed client crashes with soap_debugspawns after a map change"
+		"Notes"		"- Fixed players losing the Half-Zatoichi after a duel death"
+		"Notes"		"- Fixed map name lowercasing, soap_teamspawnrandom on reload, and a bunch of memory leaks"
+		"Notes"		"- See https://github.com/sapphonie/SOAP-TF2DM/releases/tag/v4.5.0 for a more complete list of changes"
 	}
 
 	"Files"
